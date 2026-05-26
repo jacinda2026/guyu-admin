@@ -20,6 +20,12 @@ const routes = [
         meta: { title: '用户管理' } 
       },
       { 
+        path: 'roles', 
+        name: 'Roles', 
+        component: () => import('../views/RoleManagement.vue'), 
+        meta: { title: '角色管理' } 
+      },
+      { 
         path: 'tenants', 
         name: 'Tenants', 
         component: () => import('../views/TenantManagement.vue'), 

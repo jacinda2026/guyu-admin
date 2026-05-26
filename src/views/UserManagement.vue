@@ -1,278 +1,214 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <div class="header-info">
-        <h2>用户与角色管理</h2>
-        <p class="subtitle">管理各入驻租户下的账号分配、角色权限及账号状态</p>
-      </div>
-      <div class="header-ops">
-        <el-button type="primary" size="default" @click="handleEdit(null)">+ 新增租户账号</el-button>
-      </div>
+  <section class="admin-page">
+    <div class="page-heading">
+      <h1>用户管理</h1>
+      <el-button type="primary" @click="openUserDialog()">+ 添加用户</el-button>
     </div>
 
-    <el-card shadow="never" class="filter-card">
-      <div class="filter-wrapper">
-        <div class="filter-left">
-          <span class="filter-label">按归属租户过滤：</span>
-          <el-select v-model="filter.tenantId" placeholder="请选择归属租户" style="width: 240px" clearable>
-            <el-option v-for="t in tenantList" :key="t.id" :label="t.name" :value="t.id">
-              <span style="float: left">{{ t.name }}</span>
-              <span style="float: right; color: #8492a6; font-size: 13px">{{ t.code }}</span>
-            </el-option>
-          </el-select>
-          <el-divider direction="vertical" style="margin: 0 20px;" />
-          <el-input v-model="filter.keyword" placeholder="搜索用户名 / 手机号" style="width: 200px" clearable prefix-icon="Search" />
-        </div>
-        <div class="filter-right">
-          <el-select v-model="filter.status" placeholder="账号状态" style="width: 120px" clearable>
-            <el-option label="正常可用" value="active" />
-            <el-option label="已封禁" value="disabled" />
-          </el-select>
-        </div>
-      </div>
-    </el-card>
-
     <el-card shadow="never" class="table-card">
-      <el-table :data="filteredUsers" style="width: 100%" stripe>
-        <el-table-column label="账号信息" min-width="200">
+      <el-table :data="pagedUsers" class="admin-table" style="width: 100%" :header-cell-style="headerCellStyle">
+        <el-table-column label="用户信息" min-width="220">
           <template #default="{ row }">
-            <div class="user-info">
-              <el-avatar :size="36" :src="row.avatar" style="background: #2b65f0">{{ row.username.charAt(0) }}</el-avatar>
-              <div class="user-meta">
-                <span class="username">{{ row.username }}</span>
-                <span class="phone">{{ row.phone }}</span>
-              </div>
+            <div class="user-cell">
+              <strong>{{ row.name }}</strong>
+              <span>{{ row.email }}</span>
             </div>
           </template>
         </el-table-column>
-
-        <el-table-column label="所属租户" min-width="180">
+        <el-table-column label="角色" width="130">
           <template #default="{ row }">
-            <div class="tenant-info">
-              <span class="tenant-name">{{ getTenantName(row.tenantId) }}</span>
-              <el-tag size="small" type="info" effect="plain" style="margin-top: 4px">{{ getTenantCode(row.tenantId) }}</el-tag>
-            </div>
+            <el-tag size="small" effect="plain" type="info">{{ row.role }}</el-tag>
           </template>
         </el-table-column>
-
-        <el-table-column label="分配角色" width="180">
+        <el-table-column label="已绑定角色" min-width="160">
           <template #default="{ row }">
-            <el-tag 
-              v-for="role in row.roles" 
-              :key="role"
-              :type="getRoleTagType(role)"
-              size="small" 
-              effect="light"
-              style="margin-right: 4px; margin-bottom: 2px"
-            >
-              {{ role }}
-            </el-tag>
+            <el-tag size="small" effect="light" type="primary">{{ row.boundRole }}</el-tag>
           </template>
         </el-table-column>
-
-        <el-table-column label="账号状态" align="center" width="100">
+        <el-table-column label="订阅计划" width="130">
           <template #default="{ row }">
-            <el-switch 
-              v-model="row.isActive" 
-              inline-prompt 
-              active-text="启" 
-              inactive-text="禁"
-              @change="handleStatusChange(row)"
-            />
+            <el-tag size="small" effect="plain" type="info">{{ row.plan }}</el-tag>
           </template>
         </el-table-column>
-
-        <el-table-column prop="lastLogin" label="最后活跃时间" width="160" />
-
-        <el-table-column label="操作" width="160" align="center" fixed="right">
+        <el-table-column label="状态" width="120">
           <template #default="{ row }">
-            <el-button type="primary" link @click="handleEdit(row)">配置角色</el-button>
-            <el-divider direction="vertical" />
-            <el-button type="primary" link>重置密码</el-button>
+            <el-tag size="small" effect="light" type="success">{{ row.status }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="registeredAt" label="注册时间" width="150" />
+        <el-table-column label="操作" width="190" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="bindRole(row)">绑定角色</el-button>
+            <el-button link type="primary" @click="openUserDialog(row)">编辑</el-button>
+            <el-button link type="danger" @click="removeUser(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination-row">
+        <span>共 {{ users.length }} 条</span>
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          background
+          layout="sizes, prev, pager, next, jumper"
+          :page-sizes="[10, 20, 50]"
+          :total="users.length"
+        />
+      </div>
     </el-card>
 
-    <el-dialog 
-      v-model="dialogVisible" 
-      :title="isEdit ? '账号与角色配置' : '新增租户账号'" 
-      width="550px"
-      destroy-on-close
-    >
-      <el-form :model="form" label-width="100px" label-position="left">
-        <el-divider content-position="left">账号归属</el-divider>
-        <el-form-item label="所属租户" required>
-          <el-select v-model="form.tenantId" placeholder="请选择归属企业/租户" style="width: 100%" :disabled="isEdit">
-            <el-option v-for="t in tenantList" :key="t.id" :label="t.name" :value="t.id" />
-          </el-select>
-          <div class="form-tip">账号必须挂载于具体租户之下，一经创建不可跨租户迁移。</div>
+    <el-dialog v-model="dialogVisible" :title="editingUser ? '编辑用户' : '添加用户'" width="520px">
+      <el-form :model="form" label-width="96px">
+        <el-form-item label="用户名称">
+          <el-input v-model="form.name" />
         </el-form-item>
-
-        <el-divider content-position="left">基本信息</el-divider>
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="用户姓名" required>
-              <el-input v-model="form.username" placeholder="如：张三" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="手机号码" required>
-              <el-input v-model="form.phone" placeholder="用于登录" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        
-        <el-form-item label="登录密码" v-if="!isEdit" required>
-          <el-input v-model="form.password" type="password" show-password placeholder="设置初始登录密码" />
+        <el-form-item label="邮箱">
+          <el-input v-model="form.email" />
         </el-form-item>
-
-        <el-divider content-position="left">租户权限配置</el-divider>
-        <el-form-item label="分配角色" required>
-          <el-select v-model="form.roles" multiple placeholder="请选择该用户在租户内的角色" style="width: 100%">
-            <el-option label="租户管理员 (拥有所有权限)" value="租户管理员" />
-            <el-option label="GEO 分析师 (可配置任务/修改提示词)" value="GEO 分析师" />
-            <el-option label="数据观察员 (仅可查看大盘数据)" value="数据观察员" />
-            <el-option label="财务审批人 (仅可查看账单及充值)" value="财务审批人" />
+        <el-form-item label="绑定角色">
+          <el-select v-model="form.boundRole" style="width: 100%">
+            <el-option v-for="role in roleOptions" :key="role" :label="role" :value="role" />
           </el-select>
         </el-form-item>
-
-        <el-form-item label="账号状态">
-          <el-switch v-model="form.isActive" active-text="允许登录" inactive-text="禁止登录" />
+        <el-form-item label="订阅计划">
+          <el-select v-model="form.plan" style="width: 100%">
+            <el-option label="免费版" value="免费版" />
+            <el-option label="专业版" value="专业版" />
+            <el-option label="企业版" value="企业版" />
+          </el-select>
         </el-form-item>
       </el-form>
-      
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitForm">确认保存</el-button>
+        <el-button type="primary" @click="saveUser">保存</el-button>
       </template>
     </el-dialog>
-  </div>
+  </section>
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
-import { Search } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { computed, reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
-// --- 基础数据字典 ---
-const tenantList = [
-  { id: 'T001', name: '谷雨GEO科技有限公司', code: 'GUYU-TECH' },
-  { id: 'T002', name: '汉庭南京店-营销部', code: 'HANTING-NJ' },
-  { id: 'T003', name: '创新科技实验组', code: 'INNO-LAB' }
-]
+const page = ref(3)
+const pageSize = ref(10)
+const dialogVisible = ref(false)
+const editingUser = ref(null)
 
-// --- 用户数据列表 ---
-const userList = ref([
-  { id: 1, username: '林总监', phone: '138****0001', tenantId: 'T001', roles: ['租户管理员', '财务审批人'], isActive: true, lastLogin: '2026-05-15 08:30:12' },
-  { id: 2, username: '陈分析师', phone: '139****1122', tenantId: 'T001', roles: ['GEO 分析师'], isActive: true, lastLogin: '2026-05-14 16:20:00' },
-  { id: 3, username: '王店长', phone: '135****3344', tenantId: 'T002', roles: ['租户管理员'], isActive: true, lastLogin: '2026-05-15 09:15:22' },
-  { id: 4, username: '测试人员A', phone: '130****9999', tenantId: 'T003', roles: ['数据观察员'], isActive: false, lastLogin: '2026-04-10 11:11:11' }
+const roleOptions = ['ADMIN', 'TENANT', '项目经理', 'VISIT']
+
+const users = ref([
+  { id: 1, name: 'Regular User', email: 'user@guyugeo.com', role: '用户', boundRole: 'ADMIN', plan: '免费版', status: '启用', registeredAt: '2026/5/9' },
+  { id: 2, name: 'Manager User', email: 'manager@guyugeo.com', role: '用户', boundRole: 'ADMIN', plan: '免费版', status: '启用', registeredAt: '2026/5/9' },
+  { id: 3, name: 'System Admin', email: 'admin@guyugeo.com', role: '用户', boundRole: 'ADMIN', plan: '免费版', status: '启用', registeredAt: '2026/5/9' },
+  { id: 4, name: '李佳英', email: 'liquiying@guyuai.com', role: '用户', boundRole: '项目经理', plan: '免费版', status: '启用', registeredAt: '2026/4/27' },
+  { id: 5, name: '蒲文静', email: 'puwenjing@guyuai.com', role: '用户', boundRole: 'TENANT', plan: '免费版', status: '启用', registeredAt: '2026/4/27' },
+  { id: 6, name: '张鹏', email: '657025171@qq.com', role: '用户', boundRole: 'TENANT', plan: '免费版', status: '启用', registeredAt: '2026/4/22' },
+  { id: 7, name: '美沃斯', email: '759070925@qq.com', role: '用户', boundRole: 'TENANT', plan: '免费版', status: '启用', registeredAt: '2026/4/22' },
+  { id: 8, name: '王文治', email: 'wenzhi.wang@topline-consulting.com.cn', role: '用户', boundRole: 'TENANT', plan: '免费版', status: '启用', registeredAt: '2026/4/15' },
+  { id: 9, name: '郭丽', email: 'guoli@guyuai.com', role: '用户', boundRole: 'TENANT', plan: '免费版', status: '启用', registeredAt: '2026/4/8' },
+  { id: 10, name: '汽车之家B', email: 'wangxin14582@autohome.com.cn', role: '用户', boundRole: 'TENANT', plan: '免费版', status: '启用', registeredAt: '2026/3/31' },
+  { id: 11, name: '谷雨运营', email: 'ops@guyugeo.com', role: '用户', boundRole: 'ADMIN', plan: '免费版', status: '启用', registeredAt: '2026/3/20' },
+  { id: 12, name: '品牌顾问', email: 'consultant@guyuai.com', role: '用户', boundRole: '项目经理', plan: '免费版', status: '启用', registeredAt: '2026/3/12' },
+  { id: 13, name: '数据观察员', email: 'viewer@guyuai.com', role: '用户', boundRole: 'VISIT', plan: '免费版', status: '启用', registeredAt: '2026/3/1' },
+  { id: 14, name: '内容运营', email: 'content@guyuai.com', role: '用户', boundRole: 'TENANT', plan: '免费版', status: '启用', registeredAt: '2026/2/24' },
+  { id: 15, name: '项目助理', email: 'assistant@guyuai.com', role: '用户', boundRole: 'TENANT', plan: '免费版', status: '启用', registeredAt: '2026/2/18' },
+  { id: 16, name: '销售运营', email: 'sales@guyuai.com', role: '用户', boundRole: 'TENANT', plan: '免费版', status: '启用', registeredAt: '2026/2/11' },
+  { id: 17, name: '客户成功', email: 'success@guyuai.com', role: '用户', boundRole: 'TENANT', plan: '免费版', status: '启用', registeredAt: '2026/2/1' },
+  { id: 18, name: '产品经理', email: 'pm@guyuai.com', role: '用户', boundRole: '项目经理', plan: '免费版', status: '启用', registeredAt: '2026/1/20' },
+  { id: 19, name: '财务账号', email: 'finance@guyuai.com', role: '用户', boundRole: 'TENANT', plan: '免费版', status: '启用', registeredAt: '2026/1/12' },
+  { id: 20, name: '测试账号A', email: 'test-a@guyuai.com', role: '用户', boundRole: 'VISIT', plan: '免费版', status: '启用', registeredAt: '2026/1/3' },
+  { id: 21, name: '测试账号B', email: 'test-b@guyuai.com', role: '用户', boundRole: 'VISIT', plan: '免费版', status: '启用', registeredAt: '2025/12/28' },
+  { id: 22, name: '投放运营', email: 'media@guyuai.com', role: '用户', boundRole: 'TENANT', plan: '免费版', status: '启用', registeredAt: '2025/12/19' },
+  { id: 23, name: '品牌经理', email: 'brand@guyuai.com', role: '用户', boundRole: '项目经理', plan: '免费版', status: '启用', registeredAt: '2025/12/8' },
+  { id: 24, name: '渠道账号', email: 'channel@guyuai.com', role: '用户', boundRole: 'TENANT', plan: '免费版', status: '启用', registeredAt: '2025/11/21' },
+  { id: 25, name: '普通访客', email: 'visit@guyuai.com', role: '用户', boundRole: 'VISIT', plan: '免费版', status: '启用', registeredAt: '2025/11/9' },
+  { id: 26, name: '运维账号', email: 'devops@guyugeo.com', role: '用户', boundRole: 'ADMIN', plan: '免费版', status: '启用', registeredAt: '2025/10/30' }
 ])
 
-// --- 筛选逻辑 ---
-const filter = reactive({
-  tenantId: '',
-  keyword: '',
-  status: ''
-})
-
-const filteredUsers = computed(() => {
-  return userList.value.filter(user => {
-    const matchTenant = filter.tenantId ? user.tenantId === filter.tenantId : true
-    const matchStatus = filter.status === 'active' ? user.isActive : (filter.status === 'disabled' ? !user.isActive : true)
-    const matchKeyword = filter.keyword ? (user.username.includes(filter.keyword) || user.phone.includes(filter.keyword)) : true
-    return matchTenant && matchStatus && matchKeyword
-  })
-})
-
-// --- 辅助工具函数 ---
-const getTenantName = (id) => tenantList.find(t => t.id === id)?.name || '未知租户'
-const getTenantCode = (id) => tenantList.find(t => t.id === id)?.code || 'UNKNOWN'
-
-const getRoleTagType = (role) => {
-  if (role.includes('管理员')) return 'danger'
-  if (role.includes('分析师')) return 'primary'
-  if (role.includes('财务')) return 'warning'
-  return 'info'
-}
-
-const handleStatusChange = (row) => {
-  ElMessage({
-    message: `账号 [${row.username}] 已${row.isActive ? '恢复使用' : '被封禁'}`,
-    type: row.isActive ? 'success' : 'warning'
-  })
-}
-
-// --- 表单与弹窗逻辑 ---
-const dialogVisible = ref(false)
-const isEdit = ref(false)
 const form = reactive({
-  id: null,
-  tenantId: '',
-  username: '',
-  phone: '',
-  password: '',
-  roles: [],
-  isActive: true
+  name: '',
+  email: '',
+  boundRole: 'TENANT',
+  plan: '免费版'
 })
 
-const handleEdit = (row) => {
-  if (row) {
-    isEdit.value = true
-    Object.assign(form, row)
-  } else {
-    isEdit.value = false
-    Object.assign(form, { id: null, tenantId: '', username: '', phone: '', password: '', roles: [], isActive: true })
-  }
+const pagedUsers = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return users.value.slice(start, start + pageSize.value)
+})
+
+const headerCellStyle = {
+  background: '#fff',
+  color: '#6b7280',
+  fontWeight: 700,
+  height: '44px'
+}
+
+const openUserDialog = (row = null) => {
+  editingUser.value = row
+  Object.assign(form, row ? {
+    name: row.name,
+    email: row.email,
+    boundRole: row.boundRole,
+    plan: row.plan
+  } : {
+    name: '',
+    email: '',
+    boundRole: 'TENANT',
+    plan: '免费版'
+  })
   dialogVisible.value = true
 }
 
-const submitForm = () => {
-  if (!form.tenantId || !form.username || !form.roles.length) {
-    ElMessage.error('请填写完整必填信息 (所属租户、姓名及角色)')
+const bindRole = (row) => {
+  openUserDialog(row)
+}
+
+const saveUser = () => {
+  if (!form.name || !form.email) {
+    ElMessage.warning('请填写用户名称和邮箱')
     return
   }
-  
-  if (isEdit.value) {
-    const idx = userList.value.findIndex(u => u.id === form.id)
-    userList.value[idx] = { ...form }
-    ElMessage.success('账号及角色配置已更新')
+
+  if (editingUser.value) {
+    Object.assign(editingUser.value, form)
+    ElMessage.success('用户信息已更新')
   } else {
-    userList.value.push({
-      ...form,
+    users.value.unshift({
       id: Date.now(),
-      lastLogin: '从未登录'
+      role: '用户',
+      status: '启用',
+      registeredAt: '2026/5/26',
+      ...form
     })
-    ElMessage.success('新账号已成功开通并分配至目标租户')
+    page.value = 1
+    ElMessage.success('用户已添加')
   }
   dialogVisible.value = false
+}
+
+const removeUser = async (row) => {
+  try {
+    await ElMessageBox.confirm(`确认删除用户「${row.name}」？`, '删除确认', { type: 'warning' })
+    users.value = users.value.filter(item => item.id !== row.id)
+    ElMessage.success('用户已删除')
+  } catch {
+    // user canceled
+  }
 }
 </script>
 
 <style scoped>
-.page-container { padding: 24px; background-color: #f8f9fb; min-height: 100vh; }
-.page-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
-.header-info h2 { margin: 0; font-size: 22px; color: #303133; }
-.subtitle { margin: 6px 0 0; color: #909399; font-size: 14px; }
-
-/* 筛选区样式 */
-.filter-card { margin-bottom: 20px; border: none; border-radius: 8px; }
-:deep(.filter-card .el-card__body) { padding: 16px 20px; }
-.filter-wrapper { display: flex; justify-content: space-between; align-items: center; }
-.filter-left { display: flex; align-items: center; }
-.filter-label { font-size: 14px; color: #606266; margin-right: 12px; font-weight: bold; }
-.filter-right { display: flex; align-items: center; }
-
-/* 表格内部组合样式 */
-.table-card { border: none; border-radius: 8px; }
-.user-info { display: flex; align-items: center; gap: 12px; }
-.user-meta { display: flex; flex-direction: column; }
-.username { font-weight: bold; color: #303133; font-size: 14px; }
-.phone { font-size: 12px; color: #909399; margin-top: 2px; }
-
-.tenant-info { display: flex; flex-direction: column; align-items: flex-start; }
-.tenant-name { font-size: 14px; color: #303133; }
-
-.form-tip { font-size: 12px; color: #e6a23c; margin-top: 6px; line-height: 1.4; }
+.admin-page { min-height: 100%; padding: 32px 40px; background: #f5f7fb; }
+.page-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+.page-heading h1 { margin: 0; color: #0f172a; font-size: 26px; font-weight: 800; }
+.table-card { border: 0; border-radius: 8px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08); }
+:deep(.table-card .el-card__body) { padding: 20px 24px 16px; }
+:deep(.admin-table .el-table__cell) { padding: 9px 0; color: #374151; }
+.user-cell { display: flex; flex-direction: column; gap: 5px; }
+.user-cell strong { color: #111827; font-size: 14px; }
+.user-cell span { color: #64748b; font-size: 12px; }
+.pagination-row { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 18px 0 0; border-top: 1px solid #e5e7eb; color: #64748b; }
 </style>

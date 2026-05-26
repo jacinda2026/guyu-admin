@@ -34,6 +34,11 @@
           <span>用户管理</span>
         </el-menu-item>
 
+        <el-menu-item index="/roles">
+          <el-icon><UserFilled /></el-icon>
+          <span>角色管理</span>
+        </el-menu-item>
+
         <el-menu-item index="/billing">
           <el-icon><Wallet /></el-icon>
           <span>费用中心</span>
@@ -131,7 +136,7 @@
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { 
-  Box, DataLine, User, OfficeBuilding, Wallet, Document, 
+  Box, DataLine, User, UserFilled, OfficeBuilding, Wallet, Document, 
   Clock, Collection, Folder, Monitor, DataAnalysis, Setting, Loading, Expand, Fold
 } from '@element-plus/icons-vue' // 🌟 补齐了之前菜单里用到但没有引入的 Wallet 与 Collection 图标
 import { useTaskStore } from '../store/task'
