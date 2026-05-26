@@ -29,6 +29,18 @@ Write-Host 'Copying dist files to docs...'
 Copy-Item -Path (Join-Path $distDir '*') -Destination $docsDir -Recurse -Force
 New-Item -ItemType File -Path (Join-Path $docsDir '.nojekyll') -Force | Out-Null
 
+Write-Host 'Removing nonessential copied public artifacts from docs...'
+Get-ChildItem -LiteralPath $docsDir -Force -Directory | Where-Object {
+  $_.Name -like 'project-proj_*' -or $_.Name -eq 'trickle-sentiment'
+} | ForEach-Object {
+  Remove-Item -LiteralPath $_.FullName -Recurse -Force
+}
+Get-ChildItem -LiteralPath $docsDir -Force -File | Where-Object {
+  $_.Name -like '* - 副本.html'
+} | ForEach-Object {
+  Remove-Item -LiteralPath $_.FullName -Force
+}
+
 Write-Host 'Committing docs deployment...'
 git add docs package.json scripts/deploy-docs.ps1
 
