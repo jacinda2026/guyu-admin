@@ -1,0 +1,30 @@
+{
+  "name": "guyu-admin",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:mobile": "vite --host 0.0.0.0",
+    "coze:proxy": "node scripts/coze-proxy.mjs",
+    "feishu:bridge": "node scripts/feishu-codex-bridge.mjs",
+    "feishu:ws": "node scripts/feishu-codex-ws.mjs",
+    "mobile": "powershell -ExecutionPolicy Bypass -File ./scripts/mobile-dev.ps1",
+    "build": "vite build",
+    "preview": "vite preview",
+    "preview:mobile": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
+    "@larksuiteoapi/node-sdk": "^1.65.0",
+    "echarts": "^6.0.0",
+    "element-plus": "^2.14.0",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.34",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.6",
+    "vite": "^8.0.12"
+  }
+}

@@ -1,0 +1,133 @@
+[
+  {
+    "id": "brand-question-expand",
+    "name": "基础品牌/产品信息的问题库拓展",
+    "description": "围绕品牌、产品、场景和用户意图生成问题库，补齐 GEO 监测的基础提问资产。",
+    "type": "geo",
+    "creator": "范范",
+    "updatedAt": "05-23 15:21",
+    "runMode": "external",
+    "url": "https://824wnmw2vg.coze.site/",
+    "icon": "Collection",
+    "theme": "theme-blue",
+    "inputSchema": [
+      { "key": "brand", "label": "品牌/产品名称", "type": "text", "required": true },
+      { "key": "description", "label": "基础信息", "type": "textarea" }
+    ],
+    "cozeWorkflowId": ""
+  },
+  {
+    "id": "keyword-expand",
+    "name": "关键词拓展工具",
+    "description": "当前内置关键词拓展能力，支持从核心词延展长尾词、场景词和内容选题方向。",
+    "type": "geo",
+    "creator": "午未",
+    "updatedAt": "05-22 17:36",
+    "runMode": "external",
+    "url": "https://g6h7wzq7r2.coze.site/",
+    "icon": "TrendCharts",
+    "theme": "theme-pink",
+    "inputSchema": [
+      { "key": "keyword", "label": "核心关键词", "type": "text", "required": true },
+      { "key": "industry", "label": "行业/场景", "type": "text" }
+    ],
+    "cozeWorkflowId": ""
+  },
+  {
+    "id": "seo-geo-diagnosis",
+    "name": "SEO/GEO网站诊断工具",
+    "description": "检测站点结构、内容收录、关键词覆盖和 GEO 可见性，输出诊断与优化建议。",
+    "type": "geo",
+    "creator": "Lee",
+    "updatedAt": "05-21 10:08",
+    "runMode": "external",
+    "url": "https://7npqkgyhsj.coze.site/",
+    "icon": "Aim",
+    "theme": "theme-cyan",
+    "inputSchema": [
+      { "key": "siteUrl", "label": "网站地址", "type": "text", "required": true },
+      { "key": "brand", "label": "品牌名称", "type": "text" }
+    ],
+    "cozeWorkflowId": ""
+  },
+  {
+    "id": "content-writing-publish",
+    "name": "内容撰写和发布工具",
+    "description": "面向 SEO/GEO 内容生产，辅助撰写文章、发布稿和多平台分发素材。",
+    "type": "content",
+    "creator": "范范",
+    "updatedAt": "05-20 18:42",
+    "runMode": "external",
+    "url": "https://trnj3bcm64.coze.site/",
+    "icon": "EditPen",
+    "theme": "theme-purple",
+    "inputSchema": [
+      { "key": "topic", "label": "内容主题", "type": "text", "required": true },
+      { "key": "requirements", "label": "写作要求", "type": "textarea" }
+    ],
+    "cozeWorkflowId": ""
+  },
+  {
+    "id": "content-effectiveness-check",
+    "name": "发文内容有效性检查工具",
+    "description": "检查待发布内容的主题覆盖、关键词匹配、可读性和 AI 收录友好度。",
+    "type": "content",
+    "creator": "午未",
+    "updatedAt": "05-18 14:09",
+    "runMode": "external",
+    "url": "https://j7nh9tfd99.coze.site/",
+    "icon": "DocumentChecked",
+    "theme": "theme-green",
+    "inputSchema": [
+      { "key": "content", "label": "待检查内容", "type": "textarea", "required": true },
+      { "key": "keywords", "label": "目标关键词", "type": "text" }
+    ],
+    "cozeWorkflowId": ""
+  },
+  {
+    "id": "content-insight-strategy",
+    "name": "内容洞察和策略分析",
+    "description": "汇总内容表现、用户意图和平台反馈，沉淀可执行的内容策略与选题机会。",
+    "type": "data",
+    "creator": "Lee",
+    "updatedAt": "05-16 09:35",
+    "runMode": "external",
+    "url": "https://geocmsgy.coze.site/",
+    "icon": "DataAnalysis",
+    "theme": "theme-orange",
+    "inputSchema": [
+      { "key": "brand", "label": "品牌名称", "type": "text", "required": true },
+      { "key": "goal", "label": "分析目标", "type": "textarea" }
+    ],
+    "cozeWorkflowId": ""
+  },
+  {
+    "id": "lead-management",
+    "name": "谷雨客户线索管理工具",
+    "description": "管理客户线索、跟进状态和转化过程，连接 GEO 服务交付与销售协同。",
+    "type": "lead",
+    "creator": "范范",
+    "updatedAt": "05-12 16:18",
+    "runMode": "external",
+    "url": "https://ds.guyuai.com/",
+    "icon": "Connection",
+    "theme": "theme-indigo",
+    "inputSchema": []
+  },
+  {
+    "id": "keyword-traffic",
+    "name": "关键词流量工具",
+    "description": "分析关键词搜索流量、趋势变化和机会等级，为内容与投放优先级提供依据。",
+    "type": "data",
+    "creator": "午未",
+    "updatedAt": "05-10 11:27",
+    "runMode": "external",
+    "url": "https://guyuhudong01.coze.site/",
+    "icon": "Files",
+    "theme": "theme-slate",
+    "inputSchema": [
+      { "key": "keyword", "label": "关键词", "type": "text", "required": true }
+    ],
+    "cozeWorkflowId": ""
+  }
+]
