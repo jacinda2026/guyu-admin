@@ -39,10 +39,14 @@
           <span>角色管理</span>
         </el-menu-item>
 
-        <el-menu-item index="/billing">
-          <el-icon><Wallet /></el-icon>
-          <span>费用中心</span>
-        </el-menu-item>
+        <el-sub-menu index="/billing">
+          <template #title>
+            <el-icon><Wallet /></el-icon>
+            <span>费用中心</span>
+          </template>
+          <el-menu-item index="/billing/users">用户费用</el-menu-item>
+          <el-menu-item index="/billing">费用与消费管理中心</el-menu-item>
+        </el-sub-menu>
 
         <el-menu-item index="/prompts">
           <el-icon><Document /></el-icon>

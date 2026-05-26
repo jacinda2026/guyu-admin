@@ -38,6 +38,12 @@ const routes = [
         meta: { title: '费用中心' } 
       },
       { 
+        path: 'billing/users', 
+        name: 'UserBillingCenter', 
+        component: () => import('../views/UserBillingCenter.vue'), 
+        meta: { title: '用户费用' } 
+      },
+      { 
         path: 'keys', 
         name: 'Keys', 
         component: () => import('../views/KeyManagement.vue'), 
