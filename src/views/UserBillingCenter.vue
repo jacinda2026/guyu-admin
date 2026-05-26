@@ -132,6 +132,7 @@
           <el-select v-model="rechargeForm.method" style="width: 100%">
             <el-option label="后台充值" value="后台充值" />
             <el-option label="线上支付" value="线上支付" />
+            <el-option label="微信支付" value="微信支付" />
             <el-option label="赠送额度" value="赠送额度" />
             <el-option label="调账" value="调账" />
           </el-select>
@@ -171,6 +172,7 @@ const users = ref([
 const rechargeRecords = ref([
   { userId: 1, time: '2026-05-20 10:18', amount: 6000, method: '线上支付', before: 2260, after: 8260, operator: 'System', remark: '企业线上充值', status: '成功' },
   { userId: 1, time: '2026-05-09 09:30', amount: 6000, method: '后台充值', before: 0, after: 6000, operator: 'admin', remark: '初始化额度', status: '成功' },
+  { userId: 2, time: '2026-05-22 13:08', amount: 5000, method: '微信支付', before: 10200, after: 15200, operator: 'System', remark: '微信商户订单 WX202605221308', status: '成功' },
   { userId: 2, time: '2026-05-18 14:22', amount: 10000, method: '后台充值', before: 5200, after: 15200, operator: 'admin', remark: '月度续费', status: '成功' },
   { userId: 4, time: '2026-05-10 16:00', amount: 5000, method: '线上支付', before: 420, after: 5420, operator: 'System', remark: '项目监控充值', status: '成功' },
   { userId: 5, time: '2026-04-28 11:20', amount: 5000, method: '赠送额度', before: 0, after: 5000, operator: 'admin', remark: '试用赠送', status: '成功' }
