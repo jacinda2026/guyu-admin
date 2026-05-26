@@ -42,7 +42,7 @@ Get-ChildItem -LiteralPath $docsDir -Force -File | Where-Object {
 }
 
 Write-Host 'Committing docs deployment...'
-git add docs package.json scripts/deploy-docs.ps1
+git add docs package.json vite.config.js scripts/deploy-docs.ps1
 
 $changes = git status --porcelain
 if ([string]::IsNullOrWhiteSpace($changes)) {
