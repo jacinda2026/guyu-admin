@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI大模型舆情监控系统</title>
+    <meta name="description" content="AI大模型舆情监控、诊断与GEO优化系统">
+    
+    <script src="https://resource.trickle.so/vendor_lib/unpkg/react@18/umd/react.production.min.js"></script>
+    <script src="https://resource.trickle.so/vendor_lib/unpkg/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://resource.trickle.so/vendor_lib/unpkg/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+    <link href="https://resource.trickle.so/vendor_lib/unpkg/lucide-static@0.516.0/font/lucide.css" rel="stylesheet">
+
+    <script>
+        // Save ChartJS instance globally to prevent clashes
+        window.ChartJS = window.Chart;
+    </script>
+
+    <style type="text/tailwindcss">
+    @layer theme {
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-body: #f3f4f6;
+            --bg-surface: #ffffff;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --border-color: #e5e7eb;
+            --sidebar-width: 260px;
+        }
+    }
+
+    @layer base {
+        body {
+            @apply bg-[var(--bg-body)] text-[var(--text-main)] font-sans antialiased;
+        }
+    }
+
+    @layer components {
+        .card {
+            @apply bg-[var(--bg-surface)] rounded-xl border border-[var(--border-color)] shadow-sm;
+        }
+        .nav-item {
+            @apply flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer;
+        }
+        .nav-item.active {
+            @apply bg-blue-50 text-[var(--primary)];
+        }
+        .nav-item:not(.active) {
+            @apply text-[var(--text-muted)] hover:bg-gray-50 hover:text-[var(--text-main)];
+        }
+        .badge {
+            @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+        }
+        .badge-danger {
+            @apply bg-red-100 text-red-800;
+        }
+        .badge-warning {
+            @apply bg-yellow-100 text-yellow-800;
+        }
+        .badge-success {
+            @apply bg-green-100 text-green-800;
+        }
+    }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel" src="components/Sidebar.js"></script>
+    <script type="text/babel" src="components/Header.js"></script>
+    <script type="text/babel" src="components/MetricCard.js"></script>
+    <script type="text/babel" src="pages/Overview.js"></script>
+    <script type="text/babel" src="pages/ModelsAnalysis.js"></script>
+    <script type="text/babel" src="pages/SourcesMonitor.js"></script>
+    <script type="text/babel" src="pages/NewsFeed.js"></script>
+    <script type="text/babel" src="pages/KeywordQueryAnalysis.js"></script>
+    <script type="text/babel" src="components/Modal.js"></script>
+    <script type="text/babel" src="pages/ProjectManagement.js"></script>
+    <script type="text/babel" src="app.js"></script>
+</body>
+</html>
