@@ -68,6 +68,13 @@
                     <span class="completed-count">{{ model.taskStats.completed }}</span>
                   </template>
                 </el-table-column>
+                <el-table-column label="失败问题" width="110" align="center">
+                  <template #default="{ row: model }">
+                    <span class="failed-count" :class="{ danger: model.taskStats.failed > 0 }">
+                      {{ model.taskStats.failed }}
+                    </span>
+                  </template>
+                </el-table-column>
                 <el-table-column label="今日负载" min-width="180">
                   <template #default="{ row: model }">
                     <div class="load-meter">
@@ -267,28 +274,28 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 
 const taskStatsMap = {
   standard: {
-    deepseek: { queued: 86, todayTotal: 1280, completed: 1048, load: 48, remark: '-' },
-    moonshot: { queued: 64, todayTotal: 1168, completed: 986, load: 42, remark: '-' },
-    doubao: { queued: 128, todayTotal: 1540, completed: 1236, load: 61, remark: '-' },
-    qwen: { queued: 72, todayTotal: 1326, completed: 1114, load: 46, remark: '-' },
-    hunyuan: { queued: 48, todayTotal: 1094, completed: 972, load: 35, remark: '-' },
-    ernie: { queued: 58, todayTotal: 1182, completed: 1026, load: 39, remark: '-' }
+    deepseek: { queued: 86, todayTotal: 1280, completed: 1048, failed: 0, load: 48, remark: '-' },
+    moonshot: { queued: 64, todayTotal: 1168, completed: 986, failed: 0, load: 42, remark: '-' },
+    doubao: { queued: 128, todayTotal: 1540, completed: 1236, failed: 1, load: 61, remark: '-' },
+    qwen: { queued: 72, todayTotal: 1326, completed: 1114, failed: 0, load: 46, remark: '-' },
+    hunyuan: { queued: 48, todayTotal: 1094, completed: 972, failed: 0, load: 35, remark: '-' },
+    ernie: { queued: 58, todayTotal: 1182, completed: 1026, failed: 0, load: 39, remark: '-' }
   },
   enhanced: {
-    deepseek: { queued: 186, todayTotal: 1846, completed: 1384, load: 72, remark: '-' },
-    moonshot: { queued: 142, todayTotal: 1732, completed: 1296, load: 66, remark: '-' },
-    doubao: { queued: 214, todayTotal: 2108, completed: 1562, load: 84, remark: '-' },
-    qwen: { queued: 168, todayTotal: 1905, completed: 1420, load: 70, remark: '-' },
-    hunyuan: { queued: 104, todayTotal: 1456, completed: 1188, load: 58, remark: '-' },
-    ernie: { queued: 136, todayTotal: 1608, completed: 1264, load: 63, remark: '-' }
+    deepseek: { queued: 186, todayTotal: 1846, completed: 1384, failed: 2, load: 72, remark: '-' },
+    moonshot: { queued: 142, todayTotal: 1732, completed: 1296, failed: 0, load: 66, remark: '-' },
+    doubao: { queued: 214, todayTotal: 2108, completed: 1562, failed: 3, load: 84, remark: '-' },
+    qwen: { queued: 168, todayTotal: 1905, completed: 1420, failed: 0, load: 70, remark: '-' },
+    hunyuan: { queued: 104, todayTotal: 1456, completed: 1188, failed: 0, load: 58, remark: '-' },
+    ernie: { queued: 136, todayTotal: 1608, completed: 1264, failed: 1, load: 63, remark: '-' }
   },
   'enhanced-ii': {
-    deepseek: { queued: 252, todayTotal: 2360, completed: 1688, load: 128, remark: '队列阻塞，排队问题持续增长' },
-    moonshot: { queued: 340, todayTotal: 2184, completed: 928, load: 316, remark: '连续10个问题，重试3次失败' },
-    doubao: { queued: 208, todayTotal: 2298, completed: 1716, load: 80, remark: '-' },
-    qwen: { queued: 196, todayTotal: 2076, completed: 1584, load: 76, remark: '接口限流，部分问题重试中' },
-    hunyuan: { queued: 154, todayTotal: 1824, completed: 1370, load: 68, remark: '-' },
-    ernie: { queued: 178, todayTotal: 1940, completed: 1486, load: 71, remark: '-' }
+    deepseek: { queued: 252, todayTotal: 2360, completed: 1688, failed: 31, load: 128, remark: '队列阻塞，排队问题持续增长' },
+    moonshot: { queued: 340, todayTotal: 2184, completed: 928, failed: 10, load: 316, remark: '连续10个问题，重试3次失败' },
+    doubao: { queued: 208, todayTotal: 2298, completed: 1716, failed: 0, load: 80, remark: '-' },
+    qwen: { queued: 196, todayTotal: 2076, completed: 1584, failed: 7, load: 76, remark: '接口限流，部分问题重试中' },
+    hunyuan: { queued: 154, todayTotal: 1824, completed: 1370, failed: 0, load: 68, remark: '-' },
+    ernie: { queued: 178, todayTotal: 1940, completed: 1486, failed: 0, load: 71, remark: '-' }
   }
 }
 
@@ -524,6 +531,8 @@ const saveModelConfig = () => {
 .queue-count { color: #1f2937; font-weight: 700; }
 .queue-count.warning { color: #dc2626; }
 .completed-count { color: #059669; font-weight: 700; }
+.failed-count { color: #94a3b8; font-weight: 700; }
+.failed-count.danger { color: #dc2626; }
 .status-remark { color: #64748b; font-size: 13px; }
 .status-remark.danger { color: #dc2626; font-weight: 700; }
 .log-table { width: 100%; }
