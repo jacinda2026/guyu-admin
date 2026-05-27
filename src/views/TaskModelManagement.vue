@@ -21,7 +21,7 @@
       </template>
 
       <el-tabs v-model="activeTab" class="model-tabs" @tab-change="handleTabChange">
-        <el-tab-pane label="任务情况" name="tasks">
+        <el-tab-pane label="问题情况" name="tasks">
           <div class="channel-list">
             <section
               v-for="channel in modelChannels"
@@ -40,7 +40,7 @@
                   </div>
                 </div>
                 <div class="channel-controls">
-                  <div class="enabled-count">{{ getChannelQueuedCount(channel) }} 个任务排队</div>
+                  <div class="enabled-count">{{ getChannelQueuedCount(channel) }} 个问题排队</div>
                 </div>
               </div>
 
@@ -53,14 +53,19 @@
                     </div>
                   </template>
                 </el-table-column>
-                <el-table-column label="排队任务" width="110" align="center">
+                <el-table-column label="排队问题" width="110" align="center">
                   <template #default="{ row: model }">
                     <span class="queue-count" :class="{ warning: model.taskStats.queued >= 200 }">{{ model.taskStats.queued }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="今日计划任务" width="120" align="center">
+                <el-table-column label="今日计划问题" width="120" align="center">
                   <template #default="{ row: model }">
                     {{ model.taskStats.todayTotal }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="实际完成问题" width="130" align="center">
+                  <template #default="{ row: model }">
+                    <span class="completed-count">{{ model.taskStats.completed }}</span>
                   </template>
                 </el-table-column>
                 <el-table-column label="今日负载" min-width="180">
@@ -82,6 +87,27 @@
                     <el-tag :type="getExecutionStatusType(model.executionStatus)" effect="dark">
                       {{ getExecutionStatusText(model.executionStatus) }}
                     </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="备注" min-width="220" show-overflow-tooltip>
+                  <template #default="{ row: model }">
+                    <span
+                      class="status-remark"
+                      :class="{ danger: model.executionStatus === 'abnormal' }"
+                    >
+                      {{ model.taskStats.remark || '-' }}
+                    </span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="100" align="center" fixed="right">
+                  <template #default="{ row: model }">
+                    <el-button
+                      link
+                      :type="model.executionStatus === 'abnormal' ? 'danger' : 'primary'"
+                      @click="openModelLogs(channel, model)"
+                    >
+                      查看日志
+                    </el-button>
                   </template>
                 </el-table-column>
               </el-table>
@@ -215,6 +241,23 @@
         </el-tab-pane>
       </el-tabs>
     </el-card>
+
+    <el-dialog v-model="logVisible" :title="logDialogTitle" width="920px">
+      <el-table :data="selectedModelLogs" border class="log-table">
+        <el-table-column prop="time" label="时间" width="160" />
+        <el-table-column prop="type" label="类型" width="110" />
+        <el-table-column prop="code" label="错误码" width="170" show-overflow-tooltip />
+        <el-table-column prop="message" label="异常信息" min-width="260" show-overflow-tooltip />
+        <el-table-column prop="affected" label="影响问题数" width="110" align="center" />
+        <el-table-column label="状态" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag :type="getLogStatusType(row.status)" effect="plain" size="small">
+              {{ row.status }}
+            </el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
@@ -224,28 +267,28 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 
 const taskStatsMap = {
   standard: {
-    deepseek: { queued: 86, todayTotal: 1280, load: 48 },
-    moonshot: { queued: 64, todayTotal: 1168, load: 42 },
-    doubao: { queued: 128, todayTotal: 1540, load: 61 },
-    qwen: { queued: 72, todayTotal: 1326, load: 46 },
-    hunyuan: { queued: 48, todayTotal: 1094, load: 35 },
-    ernie: { queued: 58, todayTotal: 1182, load: 39 }
+    deepseek: { queued: 86, todayTotal: 1280, completed: 1048, load: 48, remark: '-' },
+    moonshot: { queued: 64, todayTotal: 1168, completed: 986, load: 42, remark: '-' },
+    doubao: { queued: 128, todayTotal: 1540, completed: 1236, load: 61, remark: '-' },
+    qwen: { queued: 72, todayTotal: 1326, completed: 1114, load: 46, remark: '-' },
+    hunyuan: { queued: 48, todayTotal: 1094, completed: 972, load: 35, remark: '-' },
+    ernie: { queued: 58, todayTotal: 1182, completed: 1026, load: 39, remark: '-' }
   },
   enhanced: {
-    deepseek: { queued: 186, todayTotal: 1846, load: 72 },
-    moonshot: { queued: 142, todayTotal: 1732, load: 66 },
-    doubao: { queued: 214, todayTotal: 2108, load: 84 },
-    qwen: { queued: 168, todayTotal: 1905, load: 70 },
-    hunyuan: { queued: 104, todayTotal: 1456, load: 58 },
-    ernie: { queued: 136, todayTotal: 1608, load: 63 }
+    deepseek: { queued: 186, todayTotal: 1846, completed: 1384, load: 72, remark: '-' },
+    moonshot: { queued: 142, todayTotal: 1732, completed: 1296, load: 66, remark: '-' },
+    doubao: { queued: 214, todayTotal: 2108, completed: 1562, load: 84, remark: '-' },
+    qwen: { queued: 168, todayTotal: 1905, completed: 1420, load: 70, remark: '-' },
+    hunyuan: { queued: 104, todayTotal: 1456, completed: 1188, load: 58, remark: '-' },
+    ernie: { queued: 136, todayTotal: 1608, completed: 1264, load: 63, remark: '-' }
   },
   'enhanced-ii': {
-    deepseek: { queued: 252, todayTotal: 2360, load: 128 },
-    moonshot: { queued: 340, todayTotal: 2184, load: 316 },
-    doubao: { queued: 208, todayTotal: 2298, load: 80 },
-    qwen: { queued: 196, todayTotal: 2076, load: 76 },
-    hunyuan: { queued: 154, todayTotal: 1824, load: 68 },
-    ernie: { queued: 178, todayTotal: 1940, load: 71 }
+    deepseek: { queued: 252, todayTotal: 2360, completed: 1688, load: 128, remark: '队列阻塞，排队问题持续增长' },
+    moonshot: { queued: 340, todayTotal: 2184, completed: 928, load: 316, remark: '连续10个问题，重试3次失败' },
+    doubao: { queued: 208, todayTotal: 2298, completed: 1716, load: 80, remark: '-' },
+    qwen: { queued: 196, todayTotal: 2076, completed: 1584, load: 76, remark: '接口限流，部分问题重试中' },
+    hunyuan: { queued: 154, todayTotal: 1824, completed: 1370, load: 68, remark: '-' },
+    ernie: { queued: 178, todayTotal: 1940, completed: 1486, load: 71, remark: '-' }
   }
 }
 
@@ -297,6 +340,36 @@ const editing = ref(false)
 const editingSnapshot = ref('')
 const editingLoadLimitKey = ref('')
 const loadLimitSnapshot = ref(null)
+const logVisible = ref(false)
+const selectedLogChannel = ref(null)
+const selectedLogModel = ref(null)
+
+const modelLogMap = {
+  'standard:deepseek': [
+    { time: '2026-05-27 10:20', type: '运行记录', code: 'OK', message: '问题派发正常，接口响应稳定', affected: 0, status: '正常' }
+  ],
+  'standard:moonshot': [
+    { time: '2026-05-27 10:18', type: '运行记录', code: 'OK', message: '问题执行正常，暂无异常', affected: 0, status: '正常' }
+  ],
+  'enhanced:deepseek': [
+    { time: '2026-05-27 10:12', type: '队列积压', code: 'QUEUE_DELAY', message: '截图问题较多，平均等待时间升高', affected: 42, status: '观察中' },
+    { time: '2026-05-27 09:56', type: '运行记录', code: 'OK', message: '模型调用成功率 98.6%', affected: 0, status: '正常' }
+  ],
+  'enhanced:doubao': [
+    { time: '2026-05-27 10:16', type: '队列积压', code: 'QUEUE_HIGH', message: '排队量偏高，建议关注完成速度', affected: 58, status: '观察中' }
+  ],
+  'enhanced-ii:deepseek': [
+    { time: '2026-05-27 10:21', type: '队列阻塞', code: 'QUEUE_BLOCKED', message: '排队问题持续增长，实际完成问题增长缓慢', affected: 96, status: '未处理' },
+    { time: '2026-05-27 10:08', type: '问题失败', code: 'MODEL_CALL_TIMEOUT', message: '连续调用超时，问题进入重试队列', affected: 31, status: '重试中' }
+  ],
+  'enhanced-ii:moonshot': [
+    { time: '2026-05-27 10:18', type: '欠费', code: 'PAYMENT_REQUIRED', message: '供应商账户余额不足，模型调用持续失败', affected: 64, status: '未处理' },
+    { time: '2026-05-27 10:23', type: '问题失败', code: 'MODEL_CALL_FAILED', message: '连续调用失败，问题进入重试队列', affected: 18, status: '重试中' }
+  ],
+  'enhanced-ii:qwen': [
+    { time: '2026-05-27 10:14', type: '接口限流', code: 'RATE_LIMITED', message: '供应商接口触发限流，部分问题延迟重试', affected: 37, status: '重试中' }
+  ]
+}
 
 const enabledModelCount = computed(() => modelChannels.value.reduce((total, channel) => {
   return total + channel.models.filter(model => channel.enabled && model.enabled).length
@@ -321,6 +394,31 @@ const getExecutionStatusType = (status) => {
     abnormal: 'danger'
   }
   return typeMap[status] || 'info'
+}
+const selectedModelLogs = computed(() => {
+  if (!selectedLogChannel.value || !selectedLogModel.value) return []
+  const key = modelRuntimeKey(selectedLogChannel.value, selectedLogModel.value)
+  return modelLogMap[key] || [
+    { time: '2026-05-27 10:20', type: '运行记录', code: 'OK', message: '问题执行正常，暂无异常', affected: 0, status: '正常' }
+  ]
+})
+const logDialogTitle = computed(() => {
+  if (!selectedLogChannel.value || !selectedLogModel.value) return '模型日志'
+  return `${selectedLogChannel.value.name} / ${selectedLogModel.value.name} · 模型日志`
+})
+const getLogStatusType = (status) => {
+  const statusMap = {
+    正常: 'success',
+    观察中: 'warning',
+    重试中: 'warning',
+    未处理: 'danger'
+  }
+  return statusMap[status] || 'info'
+}
+const openModelLogs = (channel, model) => {
+  selectedLogChannel.value = channel
+  selectedLogModel.value = model
+  logVisible.value = true
 }
 
 const handleTabChange = () => {
@@ -425,6 +523,10 @@ const saveModelConfig = () => {
 .editable-value:hover { color: #1d4ed8; text-decoration: underline; }
 .queue-count { color: #1f2937; font-weight: 700; }
 .queue-count.warning { color: #dc2626; }
+.completed-count { color: #059669; font-weight: 700; }
+.status-remark { color: #64748b; font-size: 13px; }
+.status-remark.danger { color: #dc2626; font-weight: 700; }
+.log-table { width: 100%; }
 :deep(.model-table .el-table__cell) { padding: 6px 0; }
 :deep(.model-table .el-table__header .el-table__cell) { padding: 7px 0; }
 

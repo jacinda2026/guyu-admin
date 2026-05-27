@@ -88,50 +88,6 @@
       </el-table>
     </el-card>
 
-    <el-card shadow="never" class="panel-card">
-      <div class="panel-toolbar">
-        <div>
-          <span class="panel-title">模型排队压力</span>
-          <el-tag size="small" effect="plain">按模型队列聚合</el-tag>
-        </div>
-      </div>
-
-      <el-table :data="modelQueueRows" class="monitor-table" height="292">
-        <el-table-column prop="model" label="模型" width="120" />
-        <el-table-column prop="channel" label="通道" width="126" />
-        <el-table-column label="队列情况" min-width="260">
-          <template #default="{ row }">
-            <div class="queue-summary">
-              <span>高 {{ row.priority.high }}</span>
-              <span>中 {{ row.priority.medium }}</span>
-              <span>低 {{ row.priority.low }}</span>
-              <strong>合计 {{ row.queued }}</strong>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="队列优先级" min-width="210">
-          <template #default="{ row }">
-            <div class="priority-stack">
-              <span class="high" :style="{ width: getPriorityWidth(row, 'high') }"></span>
-              <span class="medium" :style="{ width: getPriorityWidth(row, 'medium') }"></span>
-              <span class="low" :style="{ width: getPriorityWidth(row, 'low') }"></span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="waitingTime" label="最长等待" width="110" align="center" />
-        <el-table-column prop="todayPlan" label="今日计划" width="100" align="center" />
-        <el-table-column label="今日负载" width="136" align="center">
-          <template #default="{ row }">
-            <span :class="['load-text', { danger: row.load >= 180 }]">{{ row.load }}%</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="执行状态" width="96" align="center">
-          <template #default="{ row }">
-            <el-tag :type="getProjectStatusType(row.status)" effect="plain">{{ getProjectStatusText(row.status) }}</el-tag>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
     </template>
 
     <el-row v-else-if="viewMode === 'detail'" :gutter="16" class="content-row">
@@ -223,7 +179,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
-import { Loading, Search, Tickets, VideoPlay, Warning } from '@element-plus/icons-vue'
+import { Search, Tickets, VideoPlay, Warning } from '@element-plus/icons-vue'
 import { useTaskStore } from '../store/task'
 
 const taskStore = useTaskStore()
@@ -343,15 +299,6 @@ const questionRows = ref([
   { projectId: 4, no: 1, question: '小米汽车SU7用户口碑分析', channelType: '增强通道 II', modelCode: 'tongyi', deepThinking: true, allScreenshot: true, screenshot: true, shareLink: false, status: 'running', priority: 3, retry: '0 / 3', createdAt: '2026-05-26 00:01:26', finishedAt: '' }
 ])
 
-const modelQueueRows = ref([
-  { model: 'DeepSeek', channel: '标准通道', status: 'running', queued: 438, priority: { high: 116, medium: 214, low: 108 }, waitingTime: '08:42', todayPlan: 1680, load: 126 },
-  { model: 'Kimi', channel: '增强通道', status: 'running', queued: 512, priority: { high: 168, medium: 256, low: 88 }, waitingTime: '11:09', todayPlan: 1920, load: 148 },
-  { model: '豆包', channel: '增强通道', status: 'running', queued: 476, priority: { high: 122, medium: 280, low: 74 }, waitingTime: '09:31', todayPlan: 1840, load: 139 },
-  { model: '通义千问', channel: '增强通道 II', status: 'queued', queued: 268, priority: { high: 54, medium: 151, low: 63 }, waitingTime: '05:16', todayPlan: 1320, load: 82 },
-  { model: '腾讯元宝', channel: '标准通道', status: 'running', queued: 693, priority: { high: 244, medium: 317, low: 132 }, waitingTime: '18:47', todayPlan: 2160, load: 236 },
-  { model: '文心一言', channel: '增强通道 II', status: 'error', queued: 186, priority: { high: 81, medium: 73, low: 32 }, waitingTime: '22:10', todayPlan: 1180, load: 188 }
-])
-
 const lastRefreshAt = ref('10:12:08')
 
 const selectedProject = computed(() => projects.value.find(item => item.id === selectedProjectId.value) || projects.value[0])
@@ -361,13 +308,17 @@ const visibleProjects = computed(() => projects.value.filter(item => ['running',
 const visibleProjectCount = computed(() => visibleProjects.value.length)
 const runningProjectCount = computed(() => projects.value.filter(item => item.status === 'running').length)
 const queuedProjectCount = computed(() => projects.value.filter(item => item.status === 'queued').length)
-const totalQueuedTasks = computed(() => modelQueueRows.value.reduce((sum, item) => sum + item.queued, 0))
-const abnormalCount = computed(() => projects.value.filter(item => item.status === 'error').length + modelQueueRows.value.filter(item => item.status === 'error').length)
+const abnormalCount = computed(() => {
+  const abnormalProjects = projects.value.filter(item => item.status === 'error').length
+  const abnormalModels = projects.value.reduce((sum, project) => {
+    return sum + project.models.filter(model => model.status === 'error').length
+  }, 0)
+  return abnormalProjects + abnormalModels
+})
 
 const metrics = computed(() => [
   { label: '执行中的项目', value: runningProjectCount.value, icon: VideoPlay, type: 'blue' },
   { label: '排队中的项目', value: queuedProjectCount.value, icon: Tickets, type: 'green' },
-  { label: '模型排队任务', value: totalQueuedTasks.value.toLocaleString(), icon: Loading, type: 'purple' },
   { label: '异常模型/项目', value: abnormalCount.value, icon: Warning, type: 'red' }
 ])
 
@@ -441,11 +392,6 @@ const getTaskStatusText = status => {
   return dict[status] || '未知'
 }
 
-const getPriorityWidth = (row, key) => {
-  if (!row.queued) return '0%'
-  return `${Math.max(4, Math.round((row.priority[key] / row.queued) * 100))}%`
-}
-
 const getModelClass = model => {
   const dict = {
     DeepSeek: 'deepseek',
@@ -493,14 +439,6 @@ const tick = () => {
       model.completed = nextCompleted
       if (model.completed >= model.total) model.status = 'idle'
     })
-  })
-
-  modelQueueRows.value.forEach(item => {
-    if (item.status === 'error') return
-    const delta = Math.floor(Math.random() * 11) - 4
-    item.queued = Math.max(0, item.queued + delta)
-    item.priority.medium = Math.max(0, item.priority.medium + delta)
-    item.load = Math.max(20, Math.round((item.queued / Math.max(item.todayPlan / 10, 1)) * 100))
   })
 
   hydrateProjectTotals()
@@ -739,35 +677,6 @@ onUnmounted(() => {
   font-size: 16px;
   font-weight: 800;
 }
-
-.queue-summary {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  color: #64748b;
-}
-
-.queue-summary strong {
-  color: #111827;
-}
-
-.priority-stack {
-  display: flex;
-  width: 100%;
-  height: 10px;
-  background: #e5e7eb;
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.priority-stack span {
-  display: block;
-  height: 100%;
-}
-
-.priority-stack .high { background: #ef4444; }
-.priority-stack .medium { background: #f59e0b; }
-.priority-stack .low { background: #3b82f6; }
 
 .load-text {
   color: #2563eb;
