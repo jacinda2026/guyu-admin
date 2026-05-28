@@ -77,6 +77,14 @@
           </el-breadcrumb>
         </div>
         <div class="header-right">
+          <el-button
+            class="analysis-entry"
+            :type="analysisPanelVisible ? 'primary' : 'default'"
+            @click="toggleAnalysisPanel"
+          >
+            <el-icon><ChatDotRound /></el-icon>
+            <span>智能分析</span>
+          </el-button>
           <el-tooltip content="返回主控制台" placement="bottom">
             <el-icon class="home-btn" @click="goHome"><House /></el-icon>
           </el-tooltip>
@@ -87,9 +95,76 @@
         </div>
       </el-header>
 
-      <el-main class="project-main-bg">
-        <router-view />
-      </el-main>
+      <div class="project-content-shell">
+        <el-main class="project-main-bg">
+          <router-view />
+        </el-main>
+
+        <aside v-if="analysisPanelVisible" class="analysis-panel">
+          <div class="analysis-panel-header">
+            <div>
+              <h3>{{ currentAnalysisGuide.title }}</h3>
+              <p>{{ currentProjectName }} · {{ currentAnalysisGuide.subtitle }}</p>
+            </div>
+            <el-button text circle class="analysis-close" @click="analysisPanelVisible = false">
+              <el-icon><Close /></el-icon>
+            </el-button>
+          </div>
+
+          <div class="analysis-topic-bar">
+            <button
+              v-for="prompt in currentAnalysisGuide.prompts"
+              :key="prompt"
+              type="button"
+              @click="useQuickPrompt(prompt)"
+            >
+              {{ prompt }}
+            </button>
+          </div>
+
+          <div class="analysis-chat">
+            <div class="analysis-guide-card">
+              <strong>{{ currentAnalysisGuide.heading }}</strong>
+              <p>{{ currentAnalysisGuide.description }}</p>
+              <ul>
+                <li v-for="item in currentAnalysisGuide.points" :key="item">{{ item }}</li>
+              </ul>
+            </div>
+            <div
+              v-for="message in analysisMessages"
+              :key="message.id"
+              class="chat-message"
+              :class="`is-${message.role}`"
+            >
+              <div class="message-avatar">
+                <el-icon v-if="message.role === 'assistant'"><Cpu /></el-icon>
+                <span v-else>我</span>
+              </div>
+              <div class="message-bubble">
+                <p>{{ message.content }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="analysis-input">
+            <el-input
+              v-model="analysisInput"
+              type="textarea"
+              :rows="3"
+              resize="none"
+              :placeholder="currentAnalysisGuide.placeholder"
+              @keydown.enter.exact.prevent="sendAnalysisMessage"
+            />
+            <div class="input-actions">
+              <span>Enter 发送</span>
+              <el-button type="primary" :disabled="!analysisInput.trim()" @click="sendAnalysisMessage">
+                <el-icon><Promotion /></el-icon>
+                发送
+              </el-button>
+            </div>
+          </div>
+        </aside>
+      </div>
     </el-container>
   </el-container>
 </template>
@@ -97,15 +172,180 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { CaretBottom, Expand, Fold, House, DataBoard, Setting } from '@element-plus/icons-vue'
+import { CaretBottom, ChatDotRound, Close, Cpu, DataBoard, Expand, Fold, House, Promotion, Setting } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
 const isMenuCollapsed = ref(false)
+const analysisPanelVisible = ref(false)
+const analysisInput = ref('')
 const asideWidth = computed(() => (isMenuCollapsed.value ? '64px' : '200px'))
+const analysisMessages = ref([])
+
+const analysisGuides = {
+  dashboard: {
+    title: '项目智能分析',
+    subtitle: '客户关注指标解读',
+    heading: '客户通常想先看项目结论',
+    description: '我会把提及率、推荐顺位、竞品差距和趋势变化翻译成客户能直接理解的业务结论。',
+    points: ['当前品牌在 AI 回答中的整体表现如何', '本周相比上周是变好还是变差', '哪些平台、问题或竞品最值得客户关注'],
+    prompts: [
+      '当期品牌表现如何？',
+      '本周表现有什么变化？',
+      '本品和竞品差距在哪里？',
+      '哪些模型对本品更友好？',
+      '哪些竞品增长最快？',
+      '本品是否存在“被提到但排位靠后”的问题？',
+      '哪些指标最影响用户判断？',
+      '下一步应该优先优化什么？'
+    ],
+    placeholder: '输入客户关注的问题，例如：帮我总结当前项目表现'
+  },
+  sources: {
+    title: '信源智能分析',
+    subtitle: '客户关心的信源覆盖与影响',
+    heading: '客户最关心的信源问题',
+    description: '我会围绕 AI 更信任哪些平台、品牌是否被权威信源覆盖、低质或负面信源是否影响认知，生成面向客户的解释和建议。',
+    points: ['我方缺的是官网、参数库、评测、论坛还是百科', '竞品被推荐是否来自更强的权威信源覆盖', '哪些低质、过期或负面信源需要优先处理'],
+    prompts: [
+      'AI主要从哪些平台认识我的品牌？',
+      '我的品牌是否出现在高权威信源中？',
+      '竞品在哪些信源上比我更强？',
+      '哪些信源正在影响AI对品牌的判断？',
+      '不同大模型引用的信源是否一致？',
+      '是否存在低质、过时或负面信源？',
+      '我应该优先优化哪些平台内容？',
+      '如何提升AI回答中的品牌可信度？'
+    ],
+    placeholder: '输入客户关注的问题，例如：给我一份信源分析报告'
+  },
+  monitor: {
+    title: '问题表现分析',
+    subtitle: '客户关心的 AI 答案表现',
+    heading: '客户通常关心哪些问题影响转化',
+    description: '我会把问题监控数据转成客户视角的答案：用户问什么时品牌表现弱、为什么竞品更容易出现、应该先优化哪些问题。',
+    points: ['哪些用户问题没有推荐我方品牌', '哪些问题里竞品占据了推荐理由', '哪些高价值问题最适合优先修复'],
+    prompts: [
+      '本品是否存在“被提到但排名靠后”的问题？',
+      '哪些问题属于“高提问、高竞品、低本品”的风险问题？',
+      '哪些问题属于“高提及、高顺位”的优势问题？',
+      '哪些标签下本品认知不足，需要补充内容资产？',
+      '哪些问题会直接影响用户购买或选择判断？',
+      '哪些问题应该进入下一轮重点优化清单？'
+    ],
+    placeholder: '输入客户关注的问题，例如：客户应该优先优化哪些问题？'
+  },
+  tasks: {
+    title: '监测进展分析',
+    subtitle: '客户关心的达标与异常原因',
+    heading: '客户通常关心为什么没达标',
+    description: '我会把任务执行、达标结果、日报周报月报和异常记录转成客户能理解的原因说明。',
+    points: ['今天任务是否达标，未达标卡在哪里', '是提及率、推荐顺位、模型覆盖还是采集失败导致异常', '当前数据能否支撑日报、周报或复盘说明'],
+    prompts: [
+      '当前监控任务执行情况如何？',
+      '哪些任务已经达标？',
+      '哪些任务未达标，原因是什么？',
+      '本次任务和上次相比有什么变化？',
+      '哪些模型覆盖不足？',
+      '最近日报表现是否稳定？',
+      '给我一份监控任务复盘报告',
+      '下一步需要调整哪些监控计划？'
+    ],
+    placeholder: '输入客户关注的问题，例如：今天的任务没有达标，问题出在哪？'
+  },
+  exports: {
+    title: '报告生成助手',
+    subtitle: '客户交付物生成建议',
+    heading: '客户通常想直接拿到可交付报告',
+    description: '我会围绕客户要交付的周报、月报、信源分析、品牌分析，整理报告重点、核心结论、风险说明和下一步行动建议。',
+    points: ['本周或本月品牌 AI 表现总结', '信源覆盖、竞品推荐原因和负面风险', '可直接放进报告的客户汇报结论'],
+    prompts: ['帮我生成一份本周的周报', '帮我生成一份最新月报', '给我一份信源分析报告', '给我一份当前的品牌分析报告'],
+    placeholder: '输入客户想要的报告，例如：帮我生成一份本周的周报'
+  },
+  questionConfig: {
+    title: '问题方向分析',
+    subtitle: '客户视角的问题覆盖建议',
+    heading: '客户通常关心问题方向是否完整',
+    description: '我会从用户决策链路出发，判断当前问题库是否覆盖品牌认知、品类选择、竞品对比、购买顾虑和负面风险。',
+    points: ['问题方向是否覆盖客户真实搜索和提问场景', '哪些高价值问题还没有纳入监控', '问题分类是否能支撑后续分析报告'],
+    prompts: [
+      '我还应该新增哪些问题？',
+      '哪些用户场景还没有覆盖？',
+      '是否需要增加竞品对比类问题？',
+      '是否需要增加功效验证类问题？',
+      '是否需要增加购买决策类问题？',
+      '是否需要增加安全成分类问题？',
+      '是否需要增加适用人群类问题？'
+    ],
+    placeholder: '输入客户关注的问题，例如：还应该补哪些方面的问题？'
+  },
+  competitorConfig: {
+    title: '竞品范围分析',
+    subtitle: '客户视角的竞品选择建议',
+    heading: '客户通常关心竞品选得准不准',
+    description: '我会判断当前竞品是否覆盖真实推荐场景，避免只看直接竞品而漏掉 AI 回答中经常出现的替代品牌。',
+    points: ['竞品是否覆盖客户真正会比较的品牌', '是否遗漏 AI 高频推荐的替代品牌', '竞品分组是否能解释推荐差距'],
+    prompts: ['竞品选择是否合理？', '有没有遗漏高频出现的竞品？', '哪些竞品最影响我方推荐？', '竞品应该按什么维度分组？'],
+    placeholder: '输入客户关注的问题，例如：有没有遗漏高频出现的竞品？'
+  },
+  monitorConfig: {
+    title: '监控配置分析',
+    subtitle: '客户视角的报告能力评估',
+    heading: '客户通常关心配置能产出什么级别的报告',
+    description: '我会根据监控周期、单日次数、模型覆盖、问题数量和截图/深度能力，判断当前配置适合日报、周报、月报还是深度专项报告。',
+    points: ['当前配置能支撑什么级别的报告', '如果要做深度报告，需要提高哪些采集维度', '监控频率和模型覆盖是否足够解释波动原因'],
+    prompts: [
+      '我现在这样配置合适吗？',
+      '每天监控一次够不够？',
+      '凌晨2点执行是否合适？',
+      '我需要监控哪些AI模型？',
+      '我的目标设得太高还是太低？',
+      '我应该看日报、周报还是月报？',
+      '帮我给出一套推荐配置？',
+      '这个监控配置能给到什么级别的报告？'
+    ],
+    placeholder: '输入客户关注的问题，例如：需要深度的报告，该如何配置？'
+  },
+  default: {
+    title: '客户智能分析',
+    subtitle: '客户关注问题解读',
+    heading: '可以直接问客户关心的问题',
+    description: '我会从客户视角解释当前项目的品牌表现、竞品差距、信源风险和报告产出建议。',
+    points: ['当前品牌表现如何', '客户应该关注哪些风险和机会', '下一步应该优化哪些平台和内容'],
+    prompts: ['当前品牌表现如何？', '竞品为什么更容易被推荐？', '给我一份客户汇报结论', '下一步优先优化什么？'],
+    placeholder: '输入客户关注的问题，例如：当前品牌表现如何？'
+  }
+}
 
 const toggleMenu = () => {
   isMenuCollapsed.value = !isMenuCollapsed.value
+}
+
+const toggleAnalysisPanel = () => {
+  analysisPanelVisible.value = !analysisPanelVisible.value
+}
+
+const useQuickPrompt = (prompt) => {
+  analysisInput.value = prompt
+  sendAnalysisMessage()
+}
+
+const sendAnalysisMessage = () => {
+  const text = analysisInput.value.trim()
+  if (!text) return
+
+  analysisMessages.value.push({
+    id: Date.now(),
+    role: 'user',
+    content: text
+  })
+
+  analysisMessages.value.push({
+    id: Date.now() + 1,
+    role: 'assistant',
+    content: `已收到「${text}」。我会按「${currentAnalysisGuide.value.title}」的分析口径，结合 ${currentProjectName.value} 的当前页面数据生成可追溯结论。`
+  })
+  analysisInput.value = ''
 }
 
 const projectOptions = [
@@ -179,6 +419,19 @@ const currentPageTitle = computed(() => {
   if (path.includes('/tasks')) return '监控任务'
   if (path.includes('/exports')) return '导出中心'
   return route.meta.title || '当前页面'
+})
+
+const currentAnalysisGuide = computed(() => {
+  const path = route.path
+  if (path.includes('/config/issue')) return analysisGuides.questionConfig
+  if (path.includes('/config/competitor')) return analysisGuides.competitorConfig
+  if (path.includes('/config/monitor')) return analysisGuides.monitorConfig
+  if (path.includes('/sources')) return analysisGuides.sources
+  if (path.includes('/monitor')) return analysisGuides.monitor
+  if (path.includes('/tasks')) return analysisGuides.tasks
+  if (path.includes('/exports')) return analysisGuides.exports
+  if (path.includes('/dashboard')) return analysisGuides.dashboard
+  return analysisGuides.default
 })
 
 const currentDetailTitle = computed(() => {
@@ -266,7 +519,7 @@ const goCurrentPage = () => {
 .project-menu.el-menu--collapse :deep(.el-menu-item-group__title) {
   display: none;
 }
-.project-main-container { display: flex; flex-direction: column; }
+.project-main-container { display: flex; flex-direction: column; min-width: 0; }
 .project-header { height: 50px; background: #fff; display: flex; justify-content: space-between; align-items: center; padding: 0 24px; border-bottom: 1px solid #e4e7ed; }
 .header-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
 .collapse-toggle { color: #606266; font-size: 18px; }
@@ -275,9 +528,138 @@ const goCurrentPage = () => {
 .breadcrumb-link { padding: 0; border: 0; background: transparent; color: #475569; font: inherit; cursor: pointer; }
 .breadcrumb-link:hover { color: #2563eb; text-decoration: underline; }
 .header-right { display: flex; align-items: center; gap: 24px; }
+.analysis-entry {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+.analysis-entry :deep(.el-icon) { margin-right: 5px; }
 .home-btn { font-size: 20px; color: #3b82f6; cursor: pointer; transition: transform 0.2s; }
 .home-btn:hover { transform: scale(1.1); }
 .user-info { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .username { font-size: 13px; color: #303133; }
-.project-main-bg { background-color: #f0f2f5; padding: 20px; }
+.project-content-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  background-color: #f0f2f5;
+}
+.project-main-bg { flex: 1; min-width: 0; background-color: #f0f2f5; padding: 20px; overflow-y: auto; }
+.analysis-panel {
+  width: 380px;
+  flex: 0 0 380px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #fff;
+  border-left: 1px solid #e5e7eb;
+  box-shadow: -8px 0 22px rgba(15, 23, 42, 0.06);
+}
+.analysis-panel-header {
+  min-height: 72px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #eef2f7;
+}
+.analysis-panel-header h3 { margin: 0; font-size: 17px; line-height: 24px; color: #111827; }
+.analysis-panel-header p { margin: 4px 0 0; font-size: 12px; line-height: 18px; color: #8a95a6; }
+.analysis-close { flex: 0 0 auto; color: #64748b; }
+.analysis-topic-bar {
+  padding: 12px 14px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #eef2f7;
+  background: #f8fafc;
+}
+.analysis-topic-bar button {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #dbe3ef;
+  border-radius: 7px;
+  background: #fff;
+  color: #334155;
+  font-size: 12px;
+  cursor: pointer;
+}
+.analysis-topic-bar button:hover {
+  color: #2563eb;
+  border-color: #b8ccff;
+  background: #eef4ff;
+}
+.analysis-chat {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.analysis-guide-card {
+  padding: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #1f2937;
+}
+.analysis-guide-card strong { display: block; font-size: 14px; line-height: 20px; }
+.analysis-guide-card p { margin: 6px 0 10px; color: #64748b; font-size: 12px; line-height: 1.6; }
+.analysis-guide-card ul { margin: 0; padding-left: 18px; color: #334155; font-size: 12px; line-height: 1.7; }
+.chat-message { display: flex; gap: 10px; align-items: flex-start; }
+.chat-message.is-user { flex-direction: row-reverse; }
+.message-avatar {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: #eef4ff;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 800;
+}
+.chat-message.is-user .message-avatar { background: #111827; color: #fff; }
+.message-bubble {
+  max-width: 278px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f3f6fb;
+  color: #253044;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.chat-message.is-user .message-bubble { background: #2563eb; color: #fff; }
+.message-bubble p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.analysis-input {
+  padding: 14px;
+  border-top: 1px solid #eef2f7;
+  background: #fff;
+}
+.input-actions {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.input-actions span { font-size: 12px; color: #94a3b8; }
+.input-actions .el-button { border-radius: 8px; font-weight: 700; }
+
+@media (max-width: 980px) {
+  .analysis-panel {
+    position: absolute;
+    top: 50px;
+    right: 0;
+    bottom: 0;
+    width: min(380px, calc(100vw - 64px));
+    z-index: 20;
+  }
+}
 </style>
