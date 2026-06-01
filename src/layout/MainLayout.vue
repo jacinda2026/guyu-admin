@@ -45,6 +45,7 @@
             <span>费用中心</span>
           </template>
           <el-menu-item index="/billing/users">用户费用</el-menu-item>
+          <el-menu-item index="/billing/pricing">费用定价</el-menu-item>
           <el-menu-item index="/billing">费用与消费管理中心</el-menu-item>
         </el-sub-menu>
 

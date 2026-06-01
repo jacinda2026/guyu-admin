@@ -378,64 +378,76 @@
         </div>
     </section>
 
-    <el-dialog v-model="conversationVisible" title="问题对话详情" width="920px" class="conversation-dialog" top="4vh">
-      <div v-if="currentConversation" class="conversation-detail">
-        <div class="conversation-head">
-          <div class="query-bubble">{{ currentConversation.question }}</div>
-          <div class="query-user">问</div>
+    <el-dialog v-model="conversationVisible" width="1180px" class="conversation-dialog" top="3vh">
+      <template #header>
+        <div v-if="currentConversation" class="conversation-meta">
+          <div>
+            <span>当前项目</span>
+            <strong>{{ currentTask?.projectName || '卓牧羊奶粉项目' }}</strong>
+          </div>
+          <p>{{ currentConversation.queryTime }}</p>
         </div>
+      </template>
+      <div v-if="currentConversation" class="conversation-detail">
         <div class="conversation-layout">
           <div class="answer-panel">
-            <div class="answer-card">
-              <div class="answer-title-row">
-                <strong>{{ currentConversation.model }}</strong>
-                <el-tag type="success" effect="plain" size="small">成功</el-tag>
+            <div class="model-avatar">{{ currentConversation.model.slice(0, 1).toUpperCase() }}</div>
+            <div class="answer-stack">
+              <div class="conversation-head">
+                <div class="query-bubble">{{ currentConversation.question }}</div>
+                <div class="query-user">问</div>
               </div>
-              <div class="answer-time">执行时间：{{ currentConversation.duration }}</div>
-              <div v-if="currentConversation.thinkingProcess?.length" class="thinking-process">
-                <div class="thinking-title">思考过程</div>
-                <div v-for="(step, index) in currentConversation.thinkingProcess" :key="index" class="thinking-step">
-                  <div class="thinking-dot"></div>
-                  <div class="thinking-content">
-                    <p>{{ step.text }}</p>
-                    <div v-if="step.links?.length" class="thinking-links">
-                      <a v-for="link in step.links" :key="link" href="#" @click.prevent>{{ link }}</a>
-                      <el-button v-if="step.showMore" size="small" plain>查看全部</el-button>
+              <div class="answer-card">
+                <div class="answer-title-row">
+                  <strong>{{ currentConversation.model }}</strong>
+                  <el-tag type="success" effect="plain" size="small">成功</el-tag>
+                </div>
+                <div class="answer-time">执行时间：{{ currentConversation.duration }}</div>
+                <div v-if="currentConversation.thinkingProcess?.length" class="thinking-process">
+                  <div class="thinking-title">思考过程</div>
+                  <div v-for="(step, index) in currentConversation.thinkingProcess" :key="index" class="thinking-step">
+                    <div class="thinking-dot"></div>
+                    <div class="thinking-content">
+                      <p>{{ step.text }}</p>
+                      <div v-if="step.links?.length" class="thinking-links">
+                        <a v-for="link in step.links" :key="link" href="#" @click.prevent>{{ link }}</a>
+                        <el-button v-if="step.showMore" size="small" plain>查看全部</el-button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              <div class="answer-content">
-                <p>以下是一些常见且受欢迎的婴幼儿护肤推荐：</p>
-                <ul>
-                  <li v-for="brand in currentConversation.answerBrands" :key="brand.name">
-                    <strong>{{ brand.name }}：</strong>{{ brand.desc }}
-                  </li>
-                </ul>
+                <div class="answer-content">
+                  <p>以下是一些常见且受欢迎的婴幼儿护肤推荐：</p>
+                  <ul>
+                    <li v-for="brand in currentConversation.answerBrands" :key="brand.name">
+                      <strong>{{ brand.name }}：</strong>{{ brand.desc }}
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
           <aside class="conversation-side">
             <section>
-              <h4>排名</h4>
+              <h4>提及品牌（{{ currentConversation.ranking.length }}个）</h4>
               <div v-for="brand in currentConversation.ranking" :key="brand.name" class="side-rank-item">
                 <span>{{ brand.name }}</span>
                 <b>{{ brand.rank }}</b>
               </div>
             </section>
             <section>
-              <h4>提及品牌</h4>
-              <div class="side-brand-list">
-                <el-tag v-if="currentConversation.mentioned" type="primary" effect="plain">初敏</el-tag>
-                <el-tag v-for="brand in currentConversation.competitorMentions" :key="brand" effect="plain">{{ brand }}</el-tag>
-              </div>
-            </section>
-            <section>
-              <h4>引用来源</h4>
-              <div v-for="source in currentConversation.sources" :key="source.url" class="source-item">
+              <h4>引用来源（{{ currentConversation.sources.length }}条）</h4>
+              <a
+                v-for="source in currentConversation.sources"
+                :key="source.url"
+                class="source-item"
+                :href="source.url"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <strong>{{ source.title }}</strong>
                 <span>{{ source.url }}</span>
-              </div>
+              </a>
             </section>
           </aside>
         </div>
@@ -755,12 +767,30 @@ const buildQuestionResults = (offset = 0, models = enabledMonitorModels, questio
     ranking: [
       { name: '艾维诺', rank: 1 },
       { name: mentioned ? '初敏' : '贝亲', rank: 2 },
-      { name: competitorMentions[0], rank: 3 }
+      { name: competitorMentions[0], rank: 3 },
+      { name: '纽强', rank: 4 },
+      { name: '妙思乐', rank: 5 },
+      { name: '松达', rank: 6 },
+      { name: '贝亲', rank: 7 },
+      { name: '丝塔芙', rank: 8 },
+      { name: '戴可思', rank: 9 },
+      { name: 'Evereden安唯伊', rank: 10 },
+      { name: '红色小象', rank: 11 },
+      { name: '青蛙王子', rank: 12 }
     ],
     sources: [
       { title: '2026宝宝面霜，告别宝宝脸蛋干痒红的换季维护之选', url: 'https://m.binews.com.cn/detail/1775194854129669.html' },
       { title: '2026宝宝面霜排名前十，科学选品守护宝宝娇嫩肌肤', url: 'https://post.smzdm.com/p/a35pzvg/' },
-      { title: '儿童面霜热门品牌排名权威榜', url: 'https://post.smzdm.com/p/awwrgr84g/' }
+      { title: '儿童面霜热门品牌排名权威榜', url: 'https://post.smzdm.com/p/awwrgr84g/' },
+      { title: '豆瓣用户湿疹护理产品实测分享', url: 'https://www.douban.com/note/725870858/' },
+      { title: '搜狐母婴：湿疹宝宝护理套装深度测评', url: 'https://www.sohu.com/a/992356918_122579131' },
+      { title: '宝宝敏感肌护肤品推荐清单', url: 'https://post.smzdm.com/p/axxxbabycare/' },
+      { title: '婴幼儿湿疹护理与屏障修护指南', url: 'https://www.mama.cn/ask/skin-care-guide.html' },
+      { title: '母婴社区宝宝面霜使用反馈汇总', url: 'https://www.babytree.com/community/skin-care/' },
+      { title: '京东婴童面霜热销榜与用户评价', url: 'https://m.jd.com/phb/key_1320897a611300ed14e.html' },
+      { title: '小红书宝宝护肤真实口碑笔记', url: 'https://www.xiaohongshu.com/search_result?keyword=宝宝面霜' },
+      { title: '知乎湿疹宝宝面霜选购讨论', url: 'https://www.zhihu.com/search?q=湿疹宝宝面霜' },
+      { title: '儿童皮肤屏障修护成分科普', url: 'https://www.yaozui.com/pediatric-skin-barrier' }
     ],
     shareUrl: `https://chat.deepseek.com/share/6b4uu7bamnc9by6ex${(sequence % 10) + 1}`,
     screenshotUrl: buildScreenshotUrl(question, model, sequence),
@@ -809,6 +839,7 @@ const tasks = ref([
   {
     id: 'MT-052201',
     name: '日常监控',
+    projectName: '卓牧羊奶粉项目',
     trigger: 'manual',
     triggerText: '手动执行',
     status: 'running',
@@ -828,6 +859,7 @@ const tasks = ref([
   {
     id: 'MT-052101',
     name: '竞品提及率全量扫描',
+    projectName: '卓牧羊奶粉项目',
     trigger: 'schedule',
     triggerText: '定时任务',
     status: 'done',
@@ -847,6 +879,7 @@ const tasks = ref([
   {
     id: 'MT-052002',
     name: '平均推荐顺位复核',
+    projectName: '卓牧羊奶粉项目',
     trigger: 'manual',
     triggerText: '手动执行',
     status: 'done',
@@ -1187,10 +1220,18 @@ const handleExportReport = (type, row) => {
 .retest-detail-head h3 { margin: 0; color: #111827; font-size: 18px; font-weight: 800; }
 .retest-detail-head p { margin: 4px 0 0; color: #64748b; font-size: 13px; }
 .retest-result-table { border: 1px solid #eef2f7; border-bottom: none; }
-.conversation-head { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-bottom: 18px; }
-.query-bubble { max-width: 360px; padding: 16px 22px; border-radius: 10px; background: #0ea5e9; color: #fff; font-weight: 700; box-shadow: 0 8px 18px rgba(14, 165, 233, .25); }
-.query-user { width: 42px; height: 42px; border-radius: 50%; background: #0ea5e9; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; }
-.conversation-layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 20px; align-items: start; }
+.conversation-meta { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin: 0; color: #8a95a6; }
+.conversation-meta div { display: flex; align-items: center; gap: 12px; }
+.conversation-meta span { font-size: 16px; font-weight: 800; color: #8a95a6; }
+.conversation-meta strong { color: #111827; font-size: 16px; }
+.conversation-meta p { margin: 0; color: #94a3b8; font-size: 13px; }
+.conversation-head { display: flex; justify-content: flex-end; align-items: center; gap: 14px; margin: 0 28px 6px 0; }
+.query-bubble { max-width: 420px; padding: 18px 24px; border-radius: 12px; background: #2997f3; color: #fff; font-weight: 800; line-height: 1.45; box-shadow: 0 10px 22px rgba(41, 151, 243, .24); }
+.query-user { width: 46px; height: 46px; border-radius: 50%; background: #2997f3; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; flex: none; }
+.conversation-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 28px; align-items: start; }
+.answer-panel { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 18px; align-items: start; }
+.answer-stack { min-width: 0; display: flex; flex-direction: column; }
+.model-avatar { width: 46px; height: 46px; margin-top: 82px; border-radius: 50%; background: #020617; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 900; text-transform: uppercase; }
 .answer-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px 22px; background: #fff; box-shadow: 0 2px 8px rgba(15, 23, 42, .04); }
 .answer-title-row { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid #eef2f7; color: #111827; }
 .answer-time { margin-top: 14px; color: #64748b; font-size: 13px; }
@@ -1204,14 +1245,17 @@ const handleExportReport = (type, row) => {
 .thinking-links a { color: #4b5563; font-size: 13px; text-decoration: underline; text-underline-offset: 2px; }
 .answer-content { margin-top: 16px; color: #334155; line-height: 1.75; font-size: 14px; }
 .answer-content li { margin-bottom: 10px; }
-.conversation-side { display: grid; gap: 18px; }
-.conversation-side h4 { margin: 0 0 10px; color: #111827; font-size: 15px; }
-.side-rank-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; }
-.side-rank-item b { min-width: 24px; height: 24px; border-radius: 6px; background: #dbeafe; color: #2563eb; display: flex; align-items: center; justify-content: center; }
-.side-brand-list { display: flex; flex-wrap: wrap; gap: 8px; }
-.source-item { padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; background: #f8fafc; }
-.source-item strong { display: block; color: #111827; font-size: 13px; line-height: 1.4; }
-.source-item span { display: block; margin-top: 4px; color: #64748b; font-size: 12px; word-break: break-all; }
+.conversation-side { display: grid; gap: 12px; max-height: 74vh; overflow: auto; padding-right: 4px; }
+.conversation-side h4 { margin: 0 0 8px; color: #111827; font-size: 15px; }
+.side-rank-item { display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; border: 1px solid #e5e7eb; border-radius: 7px; margin-bottom: 6px; background: #fff; }
+.side-rank-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #4b5563; font-size: 13px; }
+.side-rank-item b { min-width: 22px; height: 22px; border-radius: 6px; background: #dbeafe; color: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.source-item { display: block; padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 7px; margin-bottom: 6px; background: #f8fafc; color: inherit; text-decoration: none; cursor: pointer; transition: border-color .16s ease, box-shadow .16s ease, background .16s ease, transform .16s ease; }
+.source-item:hover { border-color: #93c5fd; background: #eff6ff; box-shadow: 0 6px 14px rgba(37, 99, 235, .12); transform: translateY(-1px); }
+.source-item:hover strong { color: #2563eb; text-decoration: underline; text-underline-offset: 3px; }
+.source-item:hover span { color: #2563eb; }
+.source-item strong { display: block; color: #111827; font-size: 12px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.source-item span { display: block; margin-top: 3px; color: #64748b; font-size: 12px; line-height: 1.35; word-break: break-all; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .muted-text { color: #94a3b8; }
 .screenshot-preview { display: grid; gap: 14px; }
 .screenshot-meta { display: flex; flex-direction: column; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid #eef2f7; }
@@ -1231,6 +1275,10 @@ const handleExportReport = (type, row) => {
 :deep(.task-detail-dialog .el-dialog__header) { padding: 14px 18px 8px; }
 :deep(.task-detail-dialog .el-dialog__body) { padding: 8px 18px 16px; max-height: 78vh; overflow: auto; }
 :deep(.retest-detail-dialog .el-dialog__body) { padding-top: 8px; }
+:deep(.conversation-dialog .el-dialog__body) { max-height: 86vh; overflow: auto; padding: 0 18px 18px; }
+:deep(.conversation-dialog .el-dialog__header) { padding: 10px 54px 6px 18px; margin-right: 0; min-height: 54px; display: flex; align-items: flex-start; }
+:deep(.conversation-dialog .el-dialog__headerbtn) { top: 8px; }
+:deep(.conversation-dialog .el-dialog__title) { display: none; }
 </style>
 
 
