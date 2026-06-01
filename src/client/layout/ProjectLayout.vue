@@ -53,6 +53,11 @@
           <el-menu-item :index="`/project/${projectId}/config/monitor`">监控配置</el-menu-item>
         </el-menu-item-group>
       </el-menu>
+
+      <button type="button" class="balance-entry" :class="{ 'is-collapsed': isMenuCollapsed }" @click="goRecharge">
+        <el-icon><CreditCard /></el-icon>
+        <span v-if="!isMenuCollapsed">余额: ¥18,186.03</span>
+      </button>
     </el-aside>
 
     <el-container class="project-main-container">
@@ -172,7 +177,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { CaretBottom, ChatDotRound, Close, Cpu, DataBoard, Expand, Fold, House, Promotion, Setting } from '@element-plus/icons-vue'
+import { CaretBottom, ChatDotRound, Close, Cpu, CreditCard, DataBoard, Expand, Fold, House, Promotion, Setting } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -452,6 +457,10 @@ const goHome = () => {
   router.push('/projects')
 }
 
+const goRecharge = () => {
+  router.push('/billing/recharge')
+}
+
 const goPrimaryMenu = () => {
   if (route.path.includes('/config/')) {
     router.push(`/project/${projectId.value}/config/issue`)
@@ -507,6 +516,36 @@ const goCurrentPage = () => {
 .project-menu { border-right: none; background: transparent; }
 .project-menu:not(.el-menu--collapse) { width: 200px; }
 .project-menu.el-menu--collapse { width: 64px; }
+.balance-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: calc(100% - 24px);
+  height: 38px;
+  margin: auto 12px 14px;
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.balance-entry:hover {
+  border-color: #93c5fd;
+  background: #e0e7ff;
+  color: #1d4ed8;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
+}
+.balance-entry .el-icon { font-size: 15px; }
+.balance-entry.is-collapsed {
+  width: 38px;
+  margin: auto auto 14px;
+  padding: 0;
+}
 .group-title { font-weight: bold; color: #111827; display: flex; align-items: center; gap: 8px; font-size: 14px; margin-top: 10px; }
 :deep(.el-menu-item-group__title) { padding-bottom: 4px; }
 :deep(.el-menu-item) { height: 40px; line-height: 40px; margin: 4px 12px; border-radius: 6px; color: #4b5563; font-size: 13px; }

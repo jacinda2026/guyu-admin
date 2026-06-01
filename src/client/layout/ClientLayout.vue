@@ -97,6 +97,11 @@
           </el-menu-item>
         </el-sub-menu>
       </el-menu>
+
+      <button type="button" class="balance-entry" :class="{ 'is-collapsed': isMenuCollapsed }" @click="goRecharge">
+        <el-icon><CreditCard /></el-icon>
+        <span v-if="!isMenuCollapsed">余额: ¥18,186.03</span>
+      </button>
     </el-aside>
 
     <el-container class="main-container">
@@ -136,7 +141,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   Bell,
   CreditCard,
@@ -154,12 +159,17 @@ import {
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
+const router = useRouter()
 const isMenuCollapsed = ref(false)
 
 const asideWidth = computed(() => (isMenuCollapsed.value ? '64px' : '240px'))
 
 const toggleMenu = () => {
   isMenuCollapsed.value = !isMenuCollapsed.value
+}
+
+const goRecharge = () => {
+  router.push('/billing/recharge')
 }
 
 const currentPrimaryMenu = computed(() => {
@@ -197,6 +207,36 @@ const currentPageTitle = computed(() => {
 .client-menu { flex: 1; border-right: none; padding-top: 10px; }
 .client-menu:not(.el-menu--collapse) { width: 240px; }
 .client-menu.el-menu--collapse { width: 64px; }
+.balance-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: calc(100% - 28px);
+  height: 38px;
+  margin: 12px 14px 14px;
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.balance-entry:hover {
+  border-color: #93c5fd;
+  background: #e0e7ff;
+  color: #1d4ed8;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.12);
+}
+.balance-entry .el-icon { font-size: 15px; }
+.balance-entry.is-collapsed {
+  width: 38px;
+  margin: 12px auto 14px;
+  padding: 0;
+}
 
 .client-menu :deep(.el-menu-item.is-active) {
   background-color: #2b65f0 !important;

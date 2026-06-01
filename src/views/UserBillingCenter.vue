@@ -100,12 +100,11 @@
             <el-tag :type="row.status === '正常' ? 'success' : 'warning'" effect="plain" size="small">{{ row.status }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="136" fixed="right">
+        <el-table-column label="操作" width="96" fixed="right">
           <template #default="{ row }">
             <div class="action-group">
               <el-button link type="primary" @click="openBillingDetail(row)">详情</el-button>
               <el-button link type="primary" @click="openRecharge(row)">充值</el-button>
-              <el-button link type="primary" @click="adjustQuota(row)">调额</el-button>
             </div>
           </template>
         </el-table-column>
@@ -595,11 +594,6 @@ const confirmRecharge = async () => {
   activeUser.value = target
   rechargeVisible.value = false
   ElMessage.success('充值记录已创建')
-}
-
-const adjustQuota = (row) => {
-  openRecharge(row)
-  rechargeForm.method = '调账'
 }
 
 onMounted(() => {
