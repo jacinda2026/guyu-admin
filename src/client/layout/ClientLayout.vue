@@ -13,7 +13,7 @@
         mode="vertical"
         router
         :default-active="route.path"
-        :default-openeds="isMenuCollapsed ? [] : ['/reports', '/billing']"
+        :default-openeds="isMenuCollapsed ? [] : ['/projects', '/reports', '/billing']"
         :collapse="isMenuCollapsed"
         :collapse-transition="false"
         class="client-menu"
@@ -21,12 +21,30 @@
         text-color="#303133"
         active-text-color="#2b65f0"
       >
-        <el-menu-item index="/projects">
-          <el-icon><FolderOpened /></el-icon>
+        <el-sub-menu index="/projects">
           <template #title>
+            <el-icon><FolderOpened /></el-icon>
             <span>项目中心</span>
           </template>
-        </el-menu-item>
+          <el-menu-item index="/projects">
+            <el-icon><FolderOpened /></el-icon>
+            <template #title>
+              <span>品牌监控</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item index="/projects/sentiment">
+            <el-icon><Warning /></el-icon>
+            <template #title>
+              <span>舆情监控</span>
+            </template>
+          </el-menu-item>
+          <el-menu-item index="/projects/opinion-deepdive">
+            <el-icon><DataAnalysis /></el-icon>
+            <template #title>
+              <span>AI 全域舆情深钻系统</span>
+            </template>
+          </el-menu-item>
+        </el-sub-menu>
 
         <el-menu-item index="/intelligence">
           <el-icon><Cpu /></el-icon>
@@ -154,7 +172,9 @@ const currentPrimaryMenu = computed(() => {
 })
 
 const currentPageTitle = computed(() => {
-  if (route.path === '/projects') return '项目中心'
+  if (route.path === '/projects') return '品牌监控'
+  if (route.path === '/projects/sentiment') return '舆情监控'
+  if (route.path === '/projects/opinion-deepdive') return 'AI 全域舆情深钻系统'
   if (route.path === '/intelligence') return '技能广场'
   if (route.path === '/report') return '发起 AI 诊断'
   if (route.path === '/reports/hotel') return '酒店单店诊断项目'

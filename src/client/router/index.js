@@ -1,6 +1,8 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import ClientLayout from '../layout/ClientLayout.vue' // 确保你的主外壳组件存在
 import ProjectLayout from '../layout/ProjectLayout.vue' // 🌟 引入刚写好的项目专属壳子
+import SentimentProjectLayout from '../layout/SentimentProjectLayout.vue'
+import OpinionProjectLayout from '../layout/OpinionProjectLayout.vue'
 const routes = [
   {
     path: '/',
@@ -18,8 +20,20 @@ const routes = [
         path: 'projects',
         name: 'ProjectCenter',
         component: () => import('../views/ProjectCenter.vue'),
-        meta: { title: '项目中心' }
-      },  
+        meta: { title: '品牌监控' }
+      },
+      {
+        path: 'projects/sentiment',
+        name: 'ProjectSentimentCenter',
+        component: () => import('../views/SentimentReportManagement.vue'),
+        meta: { title: '舆情监控' }
+      },
+      {
+        path: 'projects/opinion-deepdive',
+        name: 'OpinionDeepDiveSystem',
+        component: () => import('../views/opinion/OpinionProjectCenter.vue'),
+        meta: { title: 'AI 全域舆情深钻系统' }
+      },
       {
         path: 'intelligence',
         name: 'SmartCenter',
@@ -104,6 +118,29 @@ const routes = [
       
       // 4. 智能体
       { path: 'agent', name: 'ProjectAgent', component: () => import('../views/project/Placeholder.vue'), meta: { title: '智能体' } }
+    ]
+  },
+  {
+    path: '/sentiment-project/:id',
+    component: SentimentProjectLayout,
+    redirect: to => `/sentiment-project/${to.params.id}/overview`,
+    children: [
+      { path: ':section(overview|risk-sources|questions|tasks|reports|config)', name: 'SentimentProjectSection', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '舆情项目' } }
+    ]
+  },
+  {
+    path: '/opinion-project/:id',
+    component: OpinionProjectLayout,
+    redirect: to => `/opinion-project/${to.params.id}/overview`,
+    children: [
+      { path: 'overview', name: 'OpinionProjectOverview', component: () => import('../views/opinion/OpinionDeepDiveSystem.vue'), meta: { title: '品牌监控首页', section: 'overview' } },
+      { path: 'questions', name: 'OpinionProjectQuestions', component: () => import('../views/opinion/OpinionDeepDiveSystem.vue'), meta: { title: '智能问题中心', section: 'questions' } },
+      { path: 'clues', name: 'OpinionProjectClues', component: () => import('../views/opinion/OpinionDeepDiveSystem.vue'), meta: { title: '舆情线索池', section: 'clues' } },
+      { path: 'deep-dive', name: 'OpinionProjectDeepDive', component: () => import('../views/opinion/OpinionDeepDiveSystem.vue'), meta: { title: '深钻分析', section: 'deepDive' } },
+      { path: 'deepDive', redirect: to => `/opinion-project/${to.params.id}/deep-dive` },
+      { path: 'evidence', name: 'OpinionProjectEvidence', component: () => import('../views/opinion/OpinionDeepDiveSystem.vue'), meta: { title: '证据链', section: 'evidence' } },
+      { path: 'alerts', name: 'OpinionProjectAlerts', component: () => import('../views/opinion/OpinionDeepDiveSystem.vue'), meta: { title: '风险预警', section: 'alerts' } },
+      { path: 'reports', name: 'OpinionProjectReports', component: () => import('../views/opinion/OpinionDeepDiveSystem.vue'), meta: { title: '报告中心', section: 'reports' } }
     ]
   }
 ]
