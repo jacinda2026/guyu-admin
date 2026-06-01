@@ -2,8 +2,8 @@
   <div class="page-container">
     <div class="page-header">
       <div class="header-info">
-        <h2>费用与消费管理中心</h2>
-        <p class="subtitle">支持充值与赠送双轨计费，精准区分付费流量与活动赠送流量</p>
+        <h2>大模型费用管理</h2>
+        <p class="subtitle">管理大模型的充值、消耗情况，精准区分付费流量与活动赠送流量</p>
       </div>
       <div class="header-ops">
         <el-button type="warning" size="default" plain @click="openGrantDialog(null)">+ 赠送额度录入</el-button>
@@ -52,11 +52,6 @@
         </div>
         
         <div class="filter-right">
-          <el-select v-model="filterTenant" placeholder="全部租户" style="width: 160px; margin-right: 10px" clearable @change="handleFilterChange">
-            <el-option label="谷雨GEO科技" value="谷雨GEO科技有限公司" />
-            <el-option label="汉庭南京店" value="汉庭南京店-营销部" />
-            <el-option label="创新科技" value="创新科技实验组" />
-          </el-select>
           <el-select v-model="filterSource" placeholder="全部通道" style="width: 140px" clearable @change="handleFilterChange">
             <el-option label="官方API" value="官方API" />
             <el-option label="新零售平台" value="新零售平台" />
@@ -96,8 +91,8 @@
               <div class="kpi-value">¥ 3,420.50</div>
             </div>
             <div class="kpi-item">
-              <div class="kpi-label">余额预警租户数</div>
-              <div class="kpi-value text-danger">2 家</div>
+              <div class="kpi-label">余额预警账户数</div>
+              <div class="kpi-value text-danger">2 个</div>
             </div>
           </div>
         </el-card>
@@ -106,42 +101,10 @@
 
     <el-card shadow="never" class="tabs-card">
       <el-tabs v-model="activeTab">
-        
-        <el-tab-pane label="租户账单总览" name="tenant">
-          <el-table :data="tenantBills" style="width: 100%" stripe>
-            <el-table-column label="租户名称" min-width="180">
-              <template #default="{ row }">
-                <el-link type="primary" :underline="true" class="tenant-detail-link" @click="openTenantDetailDrawer(row)">
-                  {{ row.tenantName }}
-                </el-link>
-              </template>
-            </el-table-column>
-            <el-table-column label="付费余额" align="right" width="150">
-              <template #default="{ row }">
-                <span :class="row.balance < 500 ? 'text-danger' : 'text-primary'">¥ {{ row.balance.toFixed(2) }}</span>
-                <el-tag v-if="row.balance < 500" size="small" type="danger" style="margin-left: 8px">预警</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="赠送可用额度" align="right" width="150">
-              <template #default="{ row }">
-                <span class="text-warning">¥ {{ row.giftBalance.toFixed(2) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="totalSpent" label="累计总消费" align="right" width="150" />
-            <el-table-column label="资金操作" width="180" align="center" fixed="right">
-              <template #default="{ row }">
-                <el-button type="primary" link @click="openRechargeDialog(row)">充值</el-button>
-                <el-divider direction="vertical" />
-                <el-button type="warning" link @click="openGrantDialog(row)">赠送</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-tab-pane>
-
         <el-tab-pane label="资金操作审计" name="recharge">
           <el-table :data="rechargeHistory" style="width: 100%">
             <el-table-column prop="orderId" label="流水单号" width="200" />
-            <el-table-column prop="tenant" label="租户名称" min-width="150" />
+            <el-table-column prop="tenant" label="大模型账户" min-width="150" />
             <el-table-column label="入账金额" align="right" width="150">
               <template #default="{ row }">
                 <span :class="row.type === '充值' ? 'text-success' : 'text-warning'" style="font-weight: bold;">
@@ -172,7 +135,7 @@
           <el-table :data="filteredConsumptionLogs" style="width: 100%" stripe>
             <el-table-column type="index" label="No." width="60" align="center" />
             <el-table-column prop="time" label="消费时间" width="160" />
-            <el-table-column prop="tenant" label="租户名称" min-width="150" />
+            <el-table-column prop="tenant" label="大模型账户" min-width="150" />
             <el-table-column prop="target" label="消费项目 (GEO 任务)" min-width="180" />
             <el-table-column label="调用模型 / 底层渠道" width="180">
               <template #default="{ row }">
@@ -203,11 +166,11 @@
       </el-tabs>
     </el-card>
 
-    <el-dialog v-model="rechargeVisible" :title="selectedTenant ? `租户充值 - ${selectedTenant.tenantName}` : '线下充值录入'" width="500px" destroy-on-close>
+    <el-dialog v-model="rechargeVisible" :title="selectedAccount ? `大模型账户充值 - ${selectedAccount.accountName}` : '线下充值录入'" width="500px" destroy-on-close>
       <el-form :model="rechargeForm" label-width="100px" label-position="left">
-        <el-form-item label="充值租户" v-if="!selectedTenant" required>
-          <el-select v-model="rechargeForm.tenantName" placeholder="请选择租户" style="width: 100%">
-            <el-option v-for="t in tenantBills" :key="t.tenantName" :label="t.tenantName" :value="t.tenantName" />
+        <el-form-item label="充值账户" v-if="!selectedAccount" required>
+          <el-select v-model="rechargeForm.accountName" placeholder="请选择大模型账户" style="width: 100%">
+            <el-option v-for="account in modelAccounts" :key="account.accountName" :label="account.accountName" :value="account.accountName" />
           </el-select>
         </el-form-item>
         <el-form-item label="充值金额" required>
@@ -232,11 +195,11 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="grantVisible" :title="selectedTenant ? `赠送额度 - ${selectedTenant.tenantName}` : '全平台额度赠送'" width="480px" destroy-on-close>
+    <el-dialog v-model="grantVisible" :title="selectedAccount ? `赠送额度 - ${selectedAccount.accountName}` : '全平台额度赠送'" width="480px" destroy-on-close>
       <el-form :model="grantForm" label-width="100px" label-position="left">
-        <el-form-item label="获赠租户" v-if="!selectedTenant" required>
-          <el-select v-model="grantForm.tenantName" placeholder="请选择租户" style="width: 100%">
-            <el-option v-for="t in tenantBills" :key="t.tenantName" :label="t.tenantName" :value="t.tenantName" />
+        <el-form-item label="获赠账户" v-if="!selectedAccount" required>
+          <el-select v-model="grantForm.accountName" placeholder="请选择大模型账户" style="width: 100%">
+            <el-option v-for="account in modelAccounts" :key="account.accountName" :label="account.accountName" :value="account.accountName" />
           </el-select>
         </el-form-item>
         <el-form-item label="赠送金额" required>
@@ -244,7 +207,7 @@
         </el-form-item>
         <el-form-item label="赠送类型" required>
           <el-select v-model="grantForm.type" style="width: 100%">
-            <el-option label="新租户体验赠送" value="trial" />
+            <el-option label="新账户体验赠送" value="trial" />
             <el-option label="接口故障补偿" value="comp" />
             <el-option label="市场营销活动" value="marketing" />
           </el-select>
@@ -276,7 +239,7 @@
         <h4 class="section-title">核心记账凭证</h4>
         <el-descriptions :column="1" border size="small" class="audit-descriptions">
           <el-descriptions-item label="全局流水单号"><span class="mono-text">{{ selectedAuditRow.orderId }}</span></el-descriptions-item>
-          <el-descriptions-item label="企业客户租户"><strong>{{ selectedAuditRow.tenant }}</strong></el-descriptions-item>
+          <el-descriptions-item label="大模型账户"><strong>{{ selectedAuditRow.tenant }}</strong></el-descriptions-item>
           <el-descriptions-item label="资金变动性质"><el-tag size="small" :type="selectedAuditRow.type === '充值' ? 'success' : 'warning'">{{ selectedAuditRow.type }}账户</el-tag></el-descriptions-item>
           <el-descriptions-item label="结算核销时间">{{ selectedAuditRow.time }}</el-descriptions-item>
           <el-descriptions-item label="后台经办操作员"><span class="operator-tag">{{ selectedAuditRow.operator }}</span></el-descriptions-item>
@@ -291,75 +254,12 @@
       </div>
     </el-drawer>
 
-    <el-drawer v-model="tenantDetailDrawerVisible" :title="selectedTenantRow ? `租户资产全景透视 - ${selectedTenantRow.tenantName}` : '租户财务详情'" size="960px" destroy-on-close>
-      <div v-if="selectedTenantRow" class="client-billing-mirror">
-        <el-row :gutter="16" class="mirror-asset-row">
-          <el-col :span="6">
-            <div class="mirror-card bg-blue-light">
-              <div class="m-meta"><span>充值可用余额 (本金)</span><el-icon><Wallet /></el-icon></div>
-              <div class="m-val"><span class="c">¥</span><span class="n">{{ selectedTenantRow.balance.toFixed(2) }}</span></div>
-              <div class="m-foot">核算性质：真金钱包</div>
-            </div>
-          </el-col>
-          <el-col :span="6">
-            <div class="mirror-card bg-green-light">
-              <div class="m-meta"><span>平台赠送额度 (体验金)</span><el-icon><Present /></el-icon></div>
-              <div class="m-val"><span class="c">¥</span><span class="n">{{ selectedTenantRow.giftBalance.toFixed(2) }}</span></div>
-              <div class="m-foot">优先扣减/活动下发</div>
-            </div>
-          </el-col>
-          <el-col :span="6">
-            <div class="mirror-card">
-              <div class="m-meta"><span>累计消耗Tokens</span><el-icon><Cpu /></el-icon></div>
-              <div class="m-val"><span class="n">4.82</span><span class="u">M</span></div>
-              <div class="m-foot">约合 4.82M 次接口交互</div>
-            </div>
-          </el-col>
-          <el-col :span="6">
-            <div class="mirror-card">
-              <div class="m-meta"><span>累计产生总消费</span><el-icon><PieChart /></el-icon></div>
-              <div class="m-val"><span class="c">¥</span><span class="n">{{ selectedTenantRow.totalSpent.toFixed(2) }}</span></div>
-              <div class="m-foot">包含历史核销与平账</div>
-            </div>
-          </el-col>
-        </el-row>
-
-        <div class="mirror-section-header">
-          <span class="m-sec-title">该租户专属消费流水审计</span>
-          <el-tag size="small" type="info">已自动开启租户沙箱隔离</el-tag>
-        </div>
-        
-        <el-table :data="tenantIsolatedLogs" style="width: 100%" stripe size="small" class="mt-12">
-          <el-table-column prop="time" label="消费时间" width="150" />
-          <el-table-column prop="target" label="消费项目 (GEO 任务)" min-width="160" show-overflow-tooltip />
-          <el-table-column label="调用模型/底层渠道" width="160">
-            <template #default="{ row }">
-              <div class="text-bold-s">{{ row.model }}</div>
-              <div class="text-sub-s">{{ row.channel }}</div>
-            </template>
-          </el-table-column>
-          <el-table-column prop="tokens" label="消耗Tokens" width="100" align="right" />
-          <el-table-column label="资金性质" width="90" align="center">
-            <template #default="{ row }">
-              <el-tag size="small" :type="row.fundType === '赠送' ? 'warning' : 'primary'" effect="plain">
-                {{ row.fundType }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="扣费金额" width="100" align="right">
-            <template #default="{ row }">
-              <span :class="row.fundType === '赠送' ? 'text-warning' : 'text-orange'">- ¥ {{ row.amount }}</span>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
-    </el-drawer>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { Calendar, ArrowDown, Wallet, Present, Cpu, PieChart } from '@element-plus/icons-vue' // 🌟 全局彻底移除了 Gift，改用 Present
+import { Calendar, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts' // 🌟 引入核心图表库
 
@@ -374,18 +274,15 @@ const selectDateShortcut = (label) => {
 }
 
 // --- 表格高级筛选状态 ---
-const filterTenant = ref('')
 const filterSource = ref('')
-const activeTab = ref('tenant')
+const activeTab = ref('recharge')
 const rechargeVisible = ref(false)
 const grantVisible = ref(false)
-const selectedTenant = ref(null)
+const selectedAccount = ref(null)
 
 // 抽屉状态
 const auditDrawerVisible = ref(false)
 const selectedAuditRow = ref(null)
-const tenantDetailDrawerVisible = ref(false)
-const selectedTenantRow = ref(null)
 
 // 🌟 ECharts 响应式挂载点与实例
 const costTrendChartRef = ref(null)
@@ -396,16 +293,12 @@ const openAuditDetails = (row) => {
   auditDrawerVisible.value = true
 }
 
-const openTenantDetailDrawer = (row) => {
-  selectedTenantRow.value = row
-  tenantDetailDrawerVisible.value = true
-}
-
 // --- 原始数据集 ---
-const tenantBills = ref([
-  { tenantName: '谷雨GEO科技有限公司', balance: 12500.50, giftBalance: 2000.00, totalSpent: 45000.00 },
-  { tenantName: '汉庭南京店-营销部', balance: 420.00, giftBalance: 50.00, totalSpent: 12800.00 }, 
-  { tenantName: '创新科技实验组', balance: 3400.00, giftBalance: 0.00, totalSpent: 2100.00 }
+const modelAccounts = ref([
+  { accountName: 'DeepSeek 官方API账户' },
+  { accountName: 'Kimi Moonshot账户' },
+  { accountName: '豆包 Doubao-pro账户' },
+  { accountName: '通义千问 Qwen-max账户' }
 ])
 
 const consumptionLogs = ref([
@@ -424,15 +317,9 @@ const rechargeHistory = ref([
 // 🌟 核心升级：消费流水与审计明细的多维过滤联动
 const filteredConsumptionLogs = computed(() => {
   return consumptionLogs.value.filter(log => {
-    const matchTenant = !filterTenant.value || log.tenant === filterTenant.value
     const matchSource = !filterSource.value || log.channel === filterSource.value
-    return matchTenant && matchSource
+    return matchSource
   })
-})
-
-const tenantIsolatedLogs = computed(() => {
-  if (!selectedTenantRow.value) return []
-  return consumptionLogs.value.filter(log => log.tenant === selectedTenantRow.value.tenantName)
 })
 
 // --- 图表初始化中心 ---
@@ -476,20 +363,20 @@ onUnmounted(() => {
 })
 
 // --- 表单交互核心 ---
-const rechargeForm = reactive({ tenantName: '', amount: 1000, method: '微信充值', proof: '', notice: '' })
-const grantForm = reactive({ tenantName: '', amount: 100, type: 'trial', expire: '', notice: '' })
+const rechargeForm = reactive({ accountName: '', amount: 1000, method: '微信充值', proof: '', notice: '' })
+const grantForm = reactive({ accountName: '', amount: 100, type: 'trial', expire: '', notice: '' })
 
-const openRechargeDialog = (tenant) => {
-  selectedTenant.value = tenant
-  rechargeForm.tenantName = tenant ? tenant.tenantName : ''
+const openRechargeDialog = (account) => {
+  selectedAccount.value = account
+  rechargeForm.accountName = account ? account.accountName : ''
   rechargeForm.amount = 1000
   rechargeVisible.value = true
 }
 const confirmRecharge = () => { ElMessage.success('资金录入成功'); rechargeVisible.value = false }
 
-const openGrantDialog = (tenant) => {
-  selectedTenant.value = tenant
-  grantForm.tenantName = tenant ? tenant.tenantName : ''
+const openGrantDialog = (account) => {
+  selectedAccount.value = account
+  grantForm.accountName = account ? account.accountName : ''
   grantForm.amount = 100
   grantVisible.value = true
 }
@@ -576,7 +463,7 @@ const confirmGrant = () => { ElMessage.success('赠送额度下发成功'); gran
 .audit-remark-box { background: #f8f9fa; border: 1px solid #e4e7ed; border-radius: 6px; padding: 14px; }
 .remark-text { margin: 0; color: #606266; line-height: 1.6; font-size: 13px; }
 
-/* 租户透视全景镜像布局 */
+/* 资产透视全景镜像布局 */
 .client-billing-mirror { padding: 4px 8px; }
 .mirror-asset-row { margin-bottom: 28px; }
 .mirror-card { background: #fff; border: 1px solid #e4e7ed; border-radius: 8px; padding: 16px; transition: all 0.2s; }

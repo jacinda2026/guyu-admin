@@ -46,7 +46,7 @@
           </template>
           <el-menu-item index="/billing/users">用户费用</el-menu-item>
           <el-menu-item index="/billing/pricing">费用定价</el-menu-item>
-          <el-menu-item index="/billing">费用与消费管理中心</el-menu-item>
+          <el-menu-item index="/billing">大模型费用管理</el-menu-item>
         </el-sub-menu>
 
         <el-menu-item index="/prompts">
@@ -102,13 +102,13 @@
               </el-icon>
             </el-button>
           </el-tooltip>
-          <el-breadcrumb v-if="headerBreadcrumbs.length" separator="/" class="header-breadcrumb">
-            <el-breadcrumb-item v-for="item in headerBreadcrumbs" :key="item.key || item.label">
+          <el-breadcrumb v-if="displayBreadcrumbs.length" separator="/" class="header-breadcrumb">
+            <el-breadcrumb-item v-for="item in displayBreadcrumbs" :key="item.key || item.label">
               <button
-                v-if="item.clickable"
+                v-if="item.clickable || item.to"
                 type="button"
                 class="header-crumb-btn"
-                @click="taskStore.handleHeaderBreadcrumb(item)"
+                @click="handleHeaderBreadcrumb(item)"
               >
                 {{ item.label }}
               </button>
@@ -139,7 +139,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { 
   Box, DataLine, User, UserFilled, OfficeBuilding, Wallet, Document, 
   Clock, Collection, Folder, Monitor, DataAnalysis, Setting, Loading, Expand, Fold
@@ -148,13 +148,40 @@ import { useTaskStore } from '../store/task'
 import { storeToRefs } from 'pinia'
 
 const route = useRoute()
+const router = useRouter()
 const taskStore = useTaskStore()
 const isMenuCollapsed = ref(false)
 const { globalProcessingCount: processingCount, headerBreadcrumbs } = storeToRefs(taskStore)
 
 const asideWidth = computed(() => (isMenuCollapsed.value ? '64px' : '240px'))
 const activeMenu = computed(() => route.path)
+const billingUserNames = {
+  1: 'Regular User',
+  2: 'Manager User',
+  3: 'System Admin',
+  4: '李佳英',
+  5: '蒲文静',
+  6: '张鹏',
+  7: '王雨晴'
+}
+const routeBreadcrumbs = computed(() => {
+  if (route.name === 'UserBillingDetail') {
+    return [
+      { label: '费用明细', to: '/billing/users' },
+      { label: billingUserNames[route.params.id] || '用户详情' }
+    ]
+  }
+  return []
+})
+const displayBreadcrumbs = computed(() => headerBreadcrumbs.value.length ? headerBreadcrumbs.value : routeBreadcrumbs.value)
 const currentRouteName = computed(() => route.meta.title || '管理后台')
+const handleHeaderBreadcrumb = (item) => {
+  if (item.to) {
+    router.push(item.to)
+    return
+  }
+  taskStore.handleHeaderBreadcrumb(item)
+}
 const toggleMenu = () => {
   isMenuCollapsed.value = !isMenuCollapsed.value
 }

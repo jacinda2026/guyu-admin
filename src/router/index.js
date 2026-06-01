@@ -35,13 +35,19 @@ const routes = [
         path: 'billing', 
         name: 'BillingManagement', 
         component: () => import('../views/BillingManagement.vue'), 
-        meta: { title: '费用中心' } 
+        meta: { title: '大模型费用管理' } 
       },
       { 
         path: 'billing/users', 
         name: 'UserBillingCenter', 
         component: () => import('../views/UserBillingCenter.vue'), 
         meta: { title: '用户费用' } 
+      },
+      {
+        path: 'billing/users/:id',
+        name: 'UserBillingDetail',
+        component: () => import('../views/UserBillingDetail.vue'),
+        meta: { title: '费用明细' }
       },
       {
         path: 'billing/pricing',
