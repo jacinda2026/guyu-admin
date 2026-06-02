@@ -22,7 +22,7 @@
       </div>
     </div>
 
-    <div v-if="!isConfigSection" class="filter-card">
+    <div v-if="showGlobalFilter" class="filter-card">
       <div class="filter-row">
         <el-select v-model="filterState.model" style="width: 160px;">
           <el-option label="所有模型" value="all" />
@@ -274,6 +274,245 @@
 
     </template>
 
+    <template v-else-if="section === 'clues'">
+      <div class="real-time-header">
+        <div>
+          <h2>舆情线索</h2>
+          <p>系统自动聚合新发信源线索与长期影响 AI 认知的舆情线索，辅助判断深钻和预警优先级</p>
+        </div>
+        <el-button plain @click="cluePoolActiveTab = 'new'">查看新发线索</el-button>
+      </div>
+
+      <div class="clue-filter-card">
+        <el-select v-model="clueFilterModel" size="small" style="width: 160px">
+          <el-option label="全部模型" value="all" />
+          <el-option label="DeepSeek" value="DeepSeek" />
+          <el-option label="豆包" value="豆包" />
+          <el-option label="Kimi" value="Kimi" />
+          <el-option label="通义千问" value="通义千问" />
+          <el-option label="文心一言" value="文心一言" />
+        </el-select>
+        <el-radio-group v-model="clueFilterRange" size="small">
+          <el-radio-button label="24h">最近24小时</el-radio-button>
+          <el-radio-button label="7d">最近7天</el-radio-button>
+          <el-radio-button label="30d">最近30天</el-radio-button>
+          <el-radio-button label="custom">自定义时间段</el-radio-button>
+        </el-radio-group>
+        <el-select v-model="clueFilterRisk" size="small" placeholder="全部风险" clearable style="width: 130px">
+          <el-option label="高风险" value="高" />
+          <el-option label="中风险" value="中" />
+          <el-option label="低风险" value="低" />
+        </el-select>
+        <span class="clue-filter-note">模型筛选主要影响 AI 舆情线索，时间和风险筛选影响全部线索。</span>
+      </div>
+
+      <el-card shadow="never" class="content-card clue-pool-card mb-16">
+        <template #header>
+          <div class="card-head">
+            <div class="card-title-stack">
+              <span>线索总览</span>
+              <small>{{ cluePoolActiveTab === 'ai' ? '长期影响模型回答的历史认知线索' : '最近新增内容聚合出的风险线索' }}</small>
+            </div>
+          </div>
+        </template>
+        <div class="clue-summary">
+          <div v-for="item in currentCluePoolCards" :key="item.label" class="clue-summary-item">
+            <span>{{ item.label }}</span>
+            <strong :class="item.type">{{ item.value }}</strong>
+            <p>{{ item.desc }}</p>
+          </div>
+        </div>
+        <el-tabs v-model="cluePoolActiveTab" class="clue-tabs">
+          <el-tab-pane label="新发信源线索" name="new">
+            <el-table :data="filteredOpinionClueRows" stripe size="small" :header-cell-style="headerCellStyle">
+              <el-table-column prop="clue" label="舆情线索" min-width="150" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <strong class="clue-title">{{ row.clue }}</strong>
+                </template>
+              </el-table-column>
+              <el-table-column prop="relatedContent" label="关联内容" min-width="280" show-overflow-tooltip />
+              <el-table-column prop="platforms" label="关联平台" min-width="180">
+                <template #default="{ row }">
+                  <div class="keyword-tags">
+                    <el-tag v-for="platform in row.platforms" :key="platform" size="small" effect="plain">{{ platform }}</el-tag>
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column prop="sourceCount" label="信源数量" width="90" align="center" sortable>
+                <template #default="{ row }">
+                  <el-button link type="primary" size="small" @click="goClueSources(row)">{{ row.sourceCount }}</el-button>
+                </template>
+              </el-table-column>
+              <el-table-column prop="negativeVolume" label="负面声量" width="100" align="center" sortable />
+              <el-table-column prop="riskLevel" label="风险等级" width="100" align="center">
+                <template #default="{ row }">
+                  <el-tag :type="row.riskLevel === '高' ? 'danger' : row.riskLevel === '中' ? 'warning' : 'info'" effect="plain">
+                    {{ row.riskLevel }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="recentActiveAt" label="最近活跃时间" width="150" />
+              <el-table-column label="操作" width="120" align="center" fixed="right">
+                <template #default="{ row }">
+                  <el-button link type="primary" size="small" @click="openClueDetail(row, 'new')">详情</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-tab-pane>
+          <el-tab-pane label="AI舆情线索" name="ai">
+            <el-table :data="filteredAiOpinionClueRows" stripe size="small" :header-cell-style="headerCellStyle">
+              <el-table-column prop="clue" label="AI线索名称" min-width="160" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <strong class="clue-title">{{ row.clue }}</strong>
+                </template>
+              </el-table-column>
+              <el-table-column prop="relatedQuestion" label="关联问题" min-width="230" show-overflow-tooltip />
+              <el-table-column prop="quoteCount" label="被引用次数" width="100" align="center" sortable>
+                <template #default="{ row }">
+                  <el-button link type="primary" size="small" @click="goClueSources(row)">{{ row.quoteCount }}</el-button>
+                </template>
+              </el-table-column>
+              <el-table-column prop="modelCount" label="影响模型数" width="100" align="center" sortable />
+              <el-table-column prop="historySourceCount" label="信源数量" width="100" align="center" sortable>
+                <template #default="{ row }">
+                  <el-button link type="primary" size="small" @click="goClueSources(row)">{{ row.historySourceCount }}</el-button>
+                </template>
+              </el-table-column>
+              <el-table-column prop="lastQuotedAt" label="最近引用时间" width="150" />
+              <el-table-column prop="negativeTags" label="负面认知标签" min-width="190">
+                <template #default="{ row }">
+                  <div class="keyword-tags">
+                    <el-tag v-for="tag in row.negativeTags" :key="tag" size="small" type="danger" effect="plain">{{ tag }}</el-tag>
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column prop="governanceAdvice" label="治理建议" min-width="240" show-overflow-tooltip />
+              <el-table-column label="操作" width="120" align="center" fixed="right">
+                <template #default="{ row }">
+                  <el-button link type="primary" size="small" @click="openClueDetail(row, 'ai')">详情</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-tab-pane>
+        </el-tabs>
+      </el-card>
+    </template>
+
+    <template v-else-if="section === 'real-time'">
+      <div class="real-time-header">
+        <div>
+          <h2>实时舆情追踪</h2>
+          <p>实时监控大模型输出与全网信源的最新动态，分析扩散趋势</p>
+        </div>
+        <el-button plain @click="refreshRealTimeFeeds">刷新数据</el-button>
+      </div>
+
+      <el-row :gutter="16" class="real-time-layout">
+        <el-col :span="16">
+          <el-card shadow="never" class="content-card real-time-feed-card">
+            <template #header>
+              <div class="card-head">
+                <span>舆情动态流</span>
+                <el-radio-group v-model="realTimeRiskFilter" size="small">
+                  <el-radio-button label="all">全部</el-radio-button>
+                  <el-radio-button label="high">仅看高风险</el-radio-button>
+                </el-radio-group>
+              </div>
+            </template>
+            <div class="real-time-feed-list">
+              <div
+                v-for="item in filteredRealTimeFeeds"
+                :key="item.id"
+                class="real-time-feed-item"
+                :class="`risk-${item.riskType}`"
+              >
+                <div class="feed-meta-row">
+                  <div class="feed-meta-left">
+                    <el-tag :type="item.riskType === 'high' ? 'danger' : item.riskType === 'medium' ? 'warning' : 'success'" effect="light">
+                      {{ item.riskLabel }}
+                    </el-tag>
+                    <el-tag type="info" effect="plain">{{ item.sourceType }}</el-tag>
+                    <span>{{ item.time }}</span>
+                  </div>
+                  <div class="feed-source">
+                    <span>{{ item.source }}</span>
+                    <b :class="item.trend === 'up' ? 'danger-text' : 'success-text'">{{ item.trend === 'up' ? '上升' : '下降' }}</b>
+                  </div>
+                </div>
+                <h3>{{ item.title }}</h3>
+                <p>{{ item.summary }}</p>
+                <div class="feed-linked-row">
+                  <span>关联线索</span>
+                  <button type="button" @click="openRealtimeClue(item)">{{ item.clue }}</button>
+                  <span>数据来源：{{ item.dataSource }}</span>
+                </div>
+                <div class="feed-actions">
+                  <button type="button" @click="openRealtimeDetail(item)">查看详情</button>
+                </div>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+
+        <el-col :span="8">
+          <el-card shadow="never" class="content-card real-time-side-card">
+            <template #header>
+              <div class="card-head">
+                <span class="title-with-help">
+                  今日舆情发酵趋势
+                  <el-tooltip
+                    content="按当天新增信源和模型巡检结果聚合。高风险包括高权重信源、风险关键词命中、被多模型引用或归属高风险线索的内容；中低风险包括中低风险信源、模型回答和正向澄清内容。"
+                    placement="top"
+                  >
+                    <el-icon><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </div>
+            </template>
+            <div class="real-time-trend-chart">
+              <svg viewBox="0 0 360 220" preserveAspectRatio="none" aria-hidden="true">
+                <line v-for="y in [34, 72, 110, 148, 186]" :key="y" x1="32" :y1="y" x2="342" :y2="y" class="grid-line" />
+                <polyline :points="realTimeHighTrendPolyline" class="real-time-high-line" />
+                <polyline :points="realTimeMediumTrendPolyline" class="real-time-medium-line" />
+                <g v-for="point in realTimeHighTrendPoints" :key="`h-${point.time}`">
+                  <circle :cx="point.x" :cy="point.y" r="4" class="real-time-high-dot" />
+                </g>
+                <g v-for="point in realTimeMediumTrendPoints" :key="`m-${point.time}`">
+                  <circle :cx="point.x" :cy="point.y" r="4" class="real-time-medium-dot" />
+                </g>
+              </svg>
+              <div class="real-time-legend">
+                <span><i class="high"></i>高风险舆情新增量</span>
+                <span><i class="medium"></i>中低风险舆情新增量</span>
+              </div>
+              <div class="axis-row"><span v-for="point in realTimeTrendItems" :key="point.time">{{ point.time }}</span></div>
+            </div>
+          </el-card>
+
+          <el-card shadow="never" class="content-card real-time-side-card">
+            <template #header>
+              <div class="card-head">
+                <div class="card-title-stack">
+                  <span>典型高危舆情扩散路径</span>
+                  <small>基于动态流中最高风险线索：{{ spreadPathClueName }}</small>
+                </div>
+              </div>
+            </template>
+            <div class="spread-path">
+              <div v-for="item in spreadPathItems" :key="item.stage" class="spread-path-item" :class="item.type">
+                <span class="path-dot"></span>
+                <div>
+                  <strong>{{ item.stage }}</strong>
+                  <small>{{ item.time }}</small>
+                  <p>{{ item.content }}</p>
+                </div>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+    </template>
+
     <template v-else-if="section === 'clue-detail'">
       <el-card shadow="never" class="content-card clue-detail-card mb-16">
         <template #header>
@@ -358,6 +597,7 @@
               <el-select v-model="sourceListPlatform" size="small" placeholder="发布平台" clearable style="width: 140px">
                 <el-option v-for="platform in sourceListPlatforms" :key="platform" :label="platform" :value="platform" />
               </el-select>
+              <el-button v-if="sourceListClue || sourceListPlatform || sourceListKeyword" size="small" plain @click="clearSourceFilters">清除筛选</el-button>
             </div>
           </div>
         </template>
@@ -406,6 +646,29 @@
             <div class="metric-label">{{ item.label }}</div>
             <div class="metric-value" :class="item.type">{{ item.value }}</div>
             <div class="metric-desc">{{ item.desc }}</div>
+          </el-card>
+        </el-col>
+      </el-row>
+
+      <el-row :gutter="16" class="mb-16">
+        <el-col :span="12">
+          <el-card shadow="never" class="content-card">
+            <template #header>负面率高的问题 TOP10</template>
+            <div v-for="(item, index) in negativeTopQuestions" :key="item.question" class="top-list-item">
+              <span class="rank-no">{{ index + 1 }}</span>
+              <button type="button">{{ item.question }}</button>
+              <strong>{{ item.rate }}%</strong>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :span="12">
+          <el-card shadow="never" class="content-card">
+            <template #header>引用信源最多的问题 TOP10</template>
+            <div v-for="(item, index) in sourceTopQuestions" :key="item.question" class="top-list-item">
+              <span class="rank-no">{{ index + 1 }}</span>
+              <button type="button">{{ item.question }}</button>
+              <strong>{{ item.count }}</strong>
+            </div>
           </el-card>
         </el-col>
       </el-row>
@@ -1541,18 +1804,23 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, UploadFilled } from '@element-plus/icons-vue'
+import { QuestionFilled, Search, UploadFilled } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
 const configPage = computed(() => route.meta.configPage || '')
 const section = computed(() => route.meta.section || route.params.section || (configPage.value ? 'config' : 'overview'))
 const isConfigSection = computed(() => section.value === 'config')
+const showGlobalFilter = computed(() => !isConfigSection.value && !['real-time', 'clues', 'clue-detail', 'question-detail'].includes(section.value))
 const sourceTab = ref('domain')
 const sourceListKeyword = ref('')
 const sourceListPlatform = ref('')
 const sourceListClue = ref('')
 const cluePoolActiveTab = ref('new')
+const clueFilterModel = ref('all')
+const clueFilterRange = ref('7d')
+const clueFilterRisk = ref('')
+const realTimeRiskFilter = ref('all')
 const questionListKeyword = ref('')
 const questionListCategory = ref('')
 const questionListRiskLevel = ref('')
@@ -1705,6 +1973,109 @@ const currentDayRiskSourceTop = [
   { name: '腾讯汽车', count: 1 }
 ]
 
+const realTimeFeedItems = [
+  {
+    id: 'RT001',
+    riskType: 'high',
+    riskLabel: '高风险',
+    time: '刚刚',
+    sourceType: '模型巡检',
+    dataSource: '对话管理 / 监控任务执行结果',
+    clue: '换壳认知固化',
+    clueType: 'ai',
+    detailTarget: 'clue',
+    source: '大模型巡检（DeepSeek）',
+    platform: 'DeepSeek',
+    trend: 'up',
+    title: 'DeepSeek最新问答将两车底盘认定为完全一致',
+    summary: '在常规提问“智己LS7底盘和奥迪一样吗”中，模型未提及星云平台差异，直接给出“同集团换壳”结论。'
+  },
+  {
+    id: 'RT002',
+    riskType: 'high',
+    riskLabel: '高风险',
+    time: '30分钟前',
+    sourceType: '全网信源',
+    dataSource: '信源列表 / 风险关键词命中',
+    clue: '竞品负面对比',
+    clueType: 'new',
+    detailTarget: 'source',
+    source: '新浪看点',
+    platform: '新浪看点',
+    trend: 'up',
+    title: '某自媒体发布《E7X其实就是智己的壳？》',
+    summary: '文章引用了多处不实言论，阅读量正在快速攀升，极易被各大模型抓取更新语料。'
+  },
+  {
+    id: 'RT003',
+    riskType: 'low',
+    riskLabel: '低风险（正向/澄清）',
+    time: '2小时前',
+    sourceType: '全网信源',
+    dataSource: '信源列表 / 正向澄清内容',
+    clue: '大模型负面认知',
+    clueType: 'new',
+    detailTarget: 'source',
+    source: '有驾',
+    platform: '有驾',
+    trend: 'down',
+    title: '有驾平台发布技术澄清分析',
+    summary: '专业作者详细解析了 ADP 平台与星云平台的核心差异，属于正向高权重内容，需加强曝光。'
+  },
+  {
+    id: 'RT004',
+    riskType: 'medium',
+    riskLabel: '中风险',
+    time: '5小时前',
+    sourceType: '社区信源',
+    dataSource: '信源列表 / 主题分类',
+    clue: '换壳认知固化',
+    clueType: 'ai',
+    detailTarget: 'source',
+    source: '易车社区',
+    platform: '易车',
+    trend: 'up',
+    title: '易车社区出现换壳疑问帖',
+    summary: '用户发帖提问两车是否为换壳车，底下跟帖存在信息模糊现象，暂无官方或认证号介入澄清。'
+  }
+]
+
+const filteredRealTimeFeeds = computed(() => {
+  if (realTimeRiskFilter.value === 'high') return realTimeFeedItems.filter(item => item.riskType === 'high')
+  return realTimeFeedItems
+})
+
+const spreadPathClueName = computed(() => realTimeFeedItems.find(item => item.riskType === 'high')?.clue || '当前最高风险线索')
+
+const realTimeTrendItems = [
+  { time: '08:00', high: 2, medium: 8 },
+  { time: '10:00', high: 5, medium: 10 },
+  { time: '12:00', high: 12, medium: 15 },
+  { time: '14:00', high: 18, medium: 22 },
+  { time: '16:00', high: 15, medium: 28 },
+  { time: '18:00', high: 8, medium: 20 },
+  { time: '20:00', high: 4, medium: 12 }
+]
+
+const realTimeTrendMax = computed(() => Math.max(...realTimeTrendItems.flatMap(item => [item.high, item.medium]), 1))
+
+const createRealTimeTrendPoints = (key) => realTimeTrendItems.map((item, index) => {
+  const x = 34 + index * 51
+  const y = 190 - (item[key] / realTimeTrendMax.value) * 152
+  return { ...item, x, y, value: item[key] }
+})
+
+const realTimeHighTrendPoints = computed(() => createRealTimeTrendPoints('high'))
+const realTimeMediumTrendPoints = computed(() => createRealTimeTrendPoints('medium'))
+const realTimeHighTrendPolyline = computed(() => realTimeHighTrendPoints.value.map(item => `${item.x},${item.y}`).join(' '))
+const realTimeMediumTrendPolyline = computed(() => realTimeMediumTrendPoints.value.map(item => `${item.x},${item.y}`).join(' '))
+
+const spreadPathItems = [
+  { stage: '源头发酵', time: '昨天 14:00', type: 'source', content: '易车社区 / 贴吧出现诱导性提问' },
+  { stage: '媒体扩散', time: '昨天 18:00', type: 'media', content: '新浪看点等抓取形成多篇“换壳”文章' },
+  { stage: '大模型收录反馈', time: '今天 08:00', type: 'model', content: 'DeepSeek / 通义千问语料更新，对用户明确输出“两车是换壳”的错误结论' }
+]
+
 const cluePoolCards = [
   { label: '聚合线索', value: '5', desc: '本期最需要关注的问题', type: 'primary' },
   { label: '高风险线索', value: '3', desc: '需要优先处置或预警', type: 'danger' },
@@ -1805,6 +2176,7 @@ const aiOpinionClueRows = [
     relatedQuestion: '奥迪E7X与智己LS7换壳争议是否属实？',
     relatedContent: '历史内容持续被多个模型引用，换壳、平台共用和官方解释不足成为稳定负面认知。',
     platforms: ['汽车之家', '懂车帝', '知乎', 'B站'],
+    models: ['DeepSeek', '豆包', 'Kimi', '通义千问', '文心一言'],
     newSourceCount: 6,
     highWeightSourceCount: 7,
     quoteCount: 58,
@@ -1823,6 +2195,7 @@ const aiOpinionClueRows = [
     relatedQuestion: '奥迪E7X和智己LS7哪个更值得买？',
     relatedContent: 'AI 回答反复引用价格和配置对比内容，形成溢价明显、购买谨慎的判断。',
     platforms: ['易车', '小红书', '汽车论坛', '今日头条'],
+    models: ['DeepSeek', '豆包', 'Kimi', '通义千问'],
     newSourceCount: 5,
     highWeightSourceCount: 4,
     quoteCount: 43,
@@ -1841,6 +2214,7 @@ const aiOpinionClueRows = [
     relatedQuestion: '奥迪E7X车主投诉主要集中在哪些方面？',
     relatedContent: '售后退款和客服响应相关历史内容仍被模型用于解释用户投诉风险。',
     platforms: ['黑猫投诉', '车质网', '微博', '抖音'],
+    models: ['DeepSeek', 'Kimi', '文心一言'],
     newSourceCount: 4,
     highWeightSourceCount: 3,
     quoteCount: 36,
@@ -1859,6 +2233,7 @@ const aiOpinionClueRows = [
     relatedQuestion: '用户怎么看奥迪E7X与智己LS7的关系？',
     relatedContent: '竞品对比内容被反复引用，容易强化配置接近、差异不清的叙事。',
     platforms: ['汽车之家', '懂车帝', '知乎', '搜狐汽车'],
+    models: ['豆包', 'Kimi', '通义千问', '文心一言'],
     newSourceCount: 3,
     highWeightSourceCount: 4,
     quoteCount: 31,
@@ -1877,6 +2252,7 @@ const aiOpinionClueRows = [
     relatedQuestion: '奥迪E7X官方技术说明是否足够清晰？',
     relatedContent: '品牌新能源转型和技术来源说明不足被模型归纳为信任挑战。',
     platforms: ['腾讯汽车', '百家号', '网易汽车', '微博'],
+    models: ['DeepSeek', '通义千问', '文心一言'],
     newSourceCount: 2,
     highWeightSourceCount: 3,
     quoteCount: 28,
@@ -1891,6 +2267,22 @@ const aiOpinionClueRows = [
     governanceAdvice: '持续发布技术路线、研发投入和真实用户体验内容。'
   }
 ]
+
+const matchClueRisk = (item) => !clueFilterRisk.value || item.riskLevel === clueFilterRisk.value
+
+const matchClueRange = (item) => {
+  if (clueFilterRange.value === '30d' || clueFilterRange.value === 'custom') return true
+  const activeTime = item.recentActiveAt || item.lastQuotedAt || ''
+  if (clueFilterRange.value === '24h') return activeTime.includes('2026-05-29')
+  return ['2026-05-23', '2026-05-24', '2026-05-25', '2026-05-26', '2026-05-27', '2026-05-28', '2026-05-29'].some(day => activeTime.includes(day))
+}
+
+const filteredOpinionClueRows = computed(() => opinionClueRows.filter(item => matchClueRisk(item) && matchClueRange(item)))
+
+const filteredAiOpinionClueRows = computed(() => aiOpinionClueRows.filter(item => {
+  const matchModel = clueFilterModel.value === 'all' || item.models?.includes(clueFilterModel.value)
+  return matchModel && matchClueRisk(item) && matchClueRange(item)
+}))
 
 const clueSourceRules = {
   售后退款难: {
@@ -1933,6 +2325,28 @@ const clueSourceRules = {
     platforms: ['腾讯汽车', '百家号', '网易汽车', '微博'],
     keywords: ['品牌信任', '新能源转型', '技术来源', '差异披露']
   }
+}
+
+const refreshRealTimeFeeds = () => {
+  ElMessage.success('实时舆情数据已刷新')
+}
+
+const openRealtimeClue = (item) => {
+  router.push({
+    path: `/sentiment-project/${route.params.id}/clue-detail`,
+    query: { clue: item.clue, type: item.clueType || 'new' }
+  })
+}
+
+const openRealtimeDetail = (item) => {
+  if (item.detailTarget === 'clue') {
+    openRealtimeClue(item)
+    return
+  }
+  router.push({
+    path: `/sentiment-project/${route.params.id}/sources`,
+    query: { clue: item.clue, platform: item.platform }
+  })
 }
 
 const goClueSources = (row) => {
@@ -1990,8 +2404,26 @@ const goSourceStats = (platform = '') => {
   })
 }
 
+const clearSourceFilters = () => {
+  sourceListKeyword.value = ''
+  sourceListPlatform.value = ''
+  sourceListClue.value = ''
+  if (section.value === 'sources' && (route.query.clue || route.query.platform)) {
+    router.replace(`/sentiment-project/${route.params.id}/sources`)
+  }
+}
+
+watch(() => route.fullPath, () => {
+  if (section.value === 'sources' && !route.query.clue && !route.query.platform) {
+    sourceListClue.value = ''
+    sourceListPlatform.value = ''
+  }
+}, { immediate: true })
+
 watch(() => route.query.platform, (platform) => {
-  if (section.value === 'sources') sourceListPlatform.value = platform || ''
+  if (section.value === 'sources') {
+    sourceListPlatform.value = platform || ''
+  }
 }, { immediate: true })
 
 watch(() => route.query.clue, (clue) => {
@@ -2253,8 +2685,9 @@ const sourceListCards = computed(() => {
 const filteredSourceList = computed(() => {
   const keyword = sourceListKeyword.value.trim().toLowerCase()
   const clueRule = clueSourceRules[sourceListClue.value]
-  return sourceListRows.filter(item => {
-    const matchPlatform = !sourceListPlatform.value || item.platform === sourceListPlatform.value
+  const selectedPlatform = sourceListPlatforms.value.includes(sourceListPlatform.value) ? sourceListPlatform.value : ''
+  const filterRows = (useClueRule = true) => sourceListRows.filter(item => {
+    const matchPlatform = !selectedPlatform || item.platform === selectedPlatform
     const searchableValues = [
       item.platform,
       item.account,
@@ -2265,7 +2698,7 @@ const filteredSourceList = computed(() => {
       item.relevance,
       ...item.keywords
     ]
-    const matchClue = !clueRule ||
+    const matchClue = !useClueRule || !clueRule ||
       clueRule.platforms.includes(item.platform) ||
       clueRule.keywords.some(ruleKeyword => searchableValues.some(value => String(value).includes(ruleKeyword)))
     const matchKeyword = !keyword || [
@@ -2273,6 +2706,9 @@ const filteredSourceList = computed(() => {
     ].some(value => String(value).toLowerCase().includes(keyword))
     return matchPlatform && matchClue && matchKeyword
   })
+  const rows = filterRows(true)
+  const fallbackRows = rows.length ? rows : filterRows(false)
+  return fallbackRows.length ? fallbackRows : sourceListRows
 })
 
 const questionListRows = [
@@ -3163,6 +3599,7 @@ const openReport = () => {
 .info-item { font-size: 13px; color: #4b5563; }
 .info-item strong { color: #111827; margin-left: 4px; }
 .danger-text { color: #f56c6c !important; }
+.success-text { color: #22c55e !important; }
 .warning-text { color: #f59e0b !important; font-weight: 700; }
 .actions {
   display: flex;
@@ -3197,6 +3634,8 @@ const openReport = () => {
 .metric-value.warning { color: #e6a23c; }
 .metric-desc { margin-top: 10px; color: #64748b; font-size: 12px; }
 .card-head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: #111827; }
+.title-with-help { display: inline-flex; align-items: center; gap: 6px; }
+.title-with-help .el-icon { color: #94a3b8; cursor: help; }
 .card-title-stack { display: flex; flex-direction: column; gap: 3px; }
 .card-title-stack small { color: #64748b; font-size: 12px; font-weight: 500; }
 .view-link { border: 0; background: transparent; color: #409eff; cursor: pointer; }
@@ -3238,6 +3677,230 @@ const openReport = () => {
 .source-top-item:hover .source-top-name { color: #2563eb; text-decoration: underline; text-underline-offset: 3px; }
 .source-top-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .source-top-item strong { color: #2563eb; font-size: 13px; }
+.real-time-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.real-time-header h2 {
+  margin: 0 0 8px;
+  color: #111827;
+  font-size: 24px;
+}
+.real-time-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+.clue-filter-card {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+.clue-filter-note {
+  color: #94a3b8;
+  font-size: 12px;
+}
+.real-time-layout { align-items: stretch; }
+.real-time-feed-card :deep(.el-card__body) {
+  max-height: 690px;
+  overflow-y: auto;
+  padding-right: 20px;
+}
+.real-time-feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.real-time-feed-item {
+  padding: 18px 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+.real-time-feed-item.risk-high {
+  border-color: #fecaca;
+  background: #fffafa;
+}
+.real-time-feed-item.risk-medium {
+  border-color: #fed7aa;
+  background: #fffaf2;
+}
+.real-time-feed-item.risk-low {
+  border-color: #bbf7d0;
+  background: #f8fffb;
+}
+.feed-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.feed-meta-left,
+.feed-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+  font-size: 13px;
+}
+.feed-source span {
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #f1f5f9;
+}
+.feed-source b { font-size: 12px; }
+.real-time-feed-item h3 {
+  margin: 0 0 8px;
+  color: #111827;
+  font-size: 17px;
+  line-height: 1.5;
+}
+.real-time-feed-item p {
+  margin: 0;
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.8;
+}
+.feed-linked-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+.feed-linked-row button {
+  border: 0;
+  border-radius: 6px;
+  padding: 3px 8px;
+  background: #eff6ff;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 12px;
+}
+.feed-linked-row button:hover { text-decoration: underline; text-underline-offset: 2px; }
+.feed-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 12px;
+}
+.feed-actions button {
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 13px;
+}
+.real-time-side-card + .real-time-side-card { margin-top: 16px; }
+.real-time-trend-chart {
+  height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+.real-time-trend-chart svg {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+.real-time-high-line,
+.real-time-medium-line {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.real-time-high-line { stroke: #ef4444; }
+.real-time-medium-line { stroke: #f59e0b; }
+.real-time-high-dot { fill: #ef4444; stroke: #fff; stroke-width: 2; }
+.real-time-medium-dot { fill: #f59e0b; stroke: #fff; stroke-width: 2; }
+.real-time-legend {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  color: #64748b;
+  font-size: 12px;
+}
+.real-time-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.real-time-legend i {
+  width: 18px;
+  height: 8px;
+  display: inline-block;
+  border: 2px solid;
+}
+.real-time-legend .high { border-color: #ef4444; }
+.real-time-legend .medium { border-color: #f59e0b; }
+.spread-path {
+  position: relative;
+  display: grid;
+  gap: 18px;
+  padding-left: 14px;
+}
+.spread-path::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  background: #e5e7eb;
+}
+.spread-path-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 12px;
+}
+.path-dot {
+  position: relative;
+  z-index: 1;
+  width: 14px;
+  height: 14px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+.spread-path-item.media .path-dot { background: #fb923c; }
+.spread-path-item.model .path-dot { background: #f87171; }
+.spread-path-item strong {
+  color: #334155;
+  font-size: 13px;
+}
+.spread-path-item small {
+  margin-left: 6px;
+  color: #94a3b8;
+}
+.spread-path-item p {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #334155;
+  line-height: 1.6;
+}
+.spread-path-item.media p {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+.spread-path-item.model p {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
 .clue-pool-card :deep(.el-card__body) { padding-top: 12px; }
 .clue-tabs :deep(.el-tabs__header) { margin: 0 0 10px; }
 .clue-tabs :deep(.el-tabs__nav-wrap::after) { height: 1px; background: #e5e7eb; }

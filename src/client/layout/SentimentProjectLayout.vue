@@ -38,11 +38,11 @@
             <div class="group-title"><el-icon><DataBoard /></el-icon> 舆情项目</div>
           </template>
           <el-menu-item :index="`/sentiment-project/${projectId}/overview`">舆情概览</el-menu-item>
+          <el-menu-item :index="`/sentiment-project/${projectId}/real-time`">实时舆情</el-menu-item>
+          <el-menu-item :index="`/sentiment-project/${projectId}/clues`">舆情线索</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/sources`">信源列表</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/question-list`">问题列表</el-menu-item>
-          <el-menu-item :index="`/sentiment-project/${projectId}/risk-sources`">风险信源</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/conversations`">对话管理</el-menu-item>
-          <el-menu-item :index="`/sentiment-project/${projectId}/questions`">舆情问题</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/tasks`">监控任务</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/reports`">舆情报告</el-menu-item>
         </el-menu-item-group>
@@ -79,7 +79,7 @@
               <button type="button" class="breadcrumb-link" @click="goQuestionList">问题列表</button>
             </el-breadcrumb-item>
             <el-breadcrumb-item v-else-if="isClueDetailPage">
-              <button type="button" class="breadcrumb-link" @click="goOverview">舆情线索池</button>
+              <button type="button" class="breadcrumb-link" @click="goClues">舆情线索</button>
             </el-breadcrumb-item>
             <el-breadcrumb-item v-else>{{ currentPageTitle }}</el-breadcrumb-item>
             <el-breadcrumb-item v-if="isQuestionDetailPage">问题</el-breadcrumb-item>
@@ -123,6 +123,8 @@ const projectOptions = [
 
 const pageTitleMap = {
   overview: '舆情概览',
+  'real-time': '实时舆情',
+  clues: '舆情线索',
   sources: '信源列表',
   'question-list': '问题列表',
   'question-detail': '问题详情',
@@ -178,8 +180,8 @@ const goQuestionList = () => {
   router.push(`/sentiment-project/${projectId.value}/question-list`)
 }
 
-const goOverview = () => {
-  router.push(`/sentiment-project/${projectId.value}/overview`)
+const goClues = () => {
+  router.push(`/sentiment-project/${projectId.value}/clues`)
 }
 </script>
 

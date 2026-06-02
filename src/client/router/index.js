@@ -131,7 +131,7 @@ const routes = [
       { path: 'config/issue', name: 'SentimentProjectConfigIssue', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '鑸嗘儏闂閰嶇疆', configPage: 'issue' } },
       { path: 'config/monitor', name: 'SentimentProjectConfigMonitor', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '鐩戞帶閰嶇疆', configPage: 'monitor' } },
       { path: 'config/alert', name: 'SentimentProjectConfigAlert', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '棰勮閰嶇疆', configPage: 'alert' } },
-      { path: ':section(overview|sources|question-list|question-detail|clue-detail|risk-sources|conversations|questions|tasks|reports)', name: 'SentimentProjectSection', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '鑸嗘儏椤圭洰' } }
+      { path: ':section(overview|real-time|clues|sources|question-list|question-detail|clue-detail|risk-sources|conversations|questions|tasks|reports)', name: 'SentimentProjectSection', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '鑸嗘儏椤圭洰' } }
     ]
   },
   {
