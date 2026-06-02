@@ -292,6 +292,100 @@
       </el-card>
     </template>
 
+    <template v-else-if="section === 'conversations'">
+      <el-card shadow="never" class="content-card conversation-manage-card">
+        <div class="conversation-page-tools">
+          <el-select v-model="conversationModelFilter" placeholder="所有模型" clearable class="conversation-model-select">
+            <el-option label="所有模型" value="" />
+            <el-option v-for="model in conversationModels" :key="model" :label="model" :value="model" />
+          </el-select>
+          <el-button class="conversation-export" plain type="primary">导出</el-button>
+        </div>
+
+        <el-tabs v-model="conversationViewMode" class="conversation-tabs">
+          <el-tab-pane label="最新对话" name="cards">
+            <div class="conversation-card-filter">
+              <el-input v-model="conversationKeyword" placeholder="搜索对话、模型、答案" clearable />
+            </div>
+            <div class="conversation-card-grid">
+              <button
+                v-for="item in filteredConversationRecords"
+                :key="item.id"
+                type="button"
+                class="conversation-preview-card"
+                @click="openConversationDetail(item)"
+              >
+                <div class="conversation-preview-title">
+                  <span class="model-badge">{{ item.modelIcon }}</span>
+                  <strong>{{ item.question }}</strong>
+                </div>
+                <p>{{ item.answerSummary }}</p>
+                <div class="conversation-preview-meta">
+                  <span>{{ item.model }}</span>
+                  <span>{{ item.queryTimeText }}</span>
+                </div>
+              </button>
+            </div>
+          </el-tab-pane>
+          <el-tab-pane label="表格浏览" name="table">
+            <div class="conversation-table-filters">
+              <el-select v-model="conversationQuestionFilter" placeholder="问题" clearable>
+                <el-option v-for="question in conversationQuestions" :key="question" :label="question" :value="question" />
+              </el-select>
+              <el-select v-model="conversationModelFilter" placeholder="监控平台" clearable>
+                <el-option v-for="model in conversationModels" :key="model" :label="model" :value="model" />
+              </el-select>
+              <el-button type="primary">筛选</el-button>
+            </div>
+            <el-table
+              :data="filteredConversationRecords"
+              size="small"
+              class="conversation-result-table"
+              :header-cell-style="headerCellStyle"
+              @row-click="openConversationDetail"
+            >
+              <el-table-column prop="question" label="问题" min-width="230" />
+              <el-table-column prop="model" label="监控平台" width="130" />
+              <el-table-column label="答案 1" min-width="520">
+                <template #default="{ row }">
+                  <div class="table-answer-cell">{{ conversationAnswerText(row) }}</div>
+                </template>
+              </el-table-column>
+              <el-table-column label="排名" width="300">
+                <template #default="{ row }">
+                  <div class="table-rank-cell">
+                    <el-tag
+                      size="small"
+                      :type="row.monitorRank ? 'success' : 'danger'"
+                      effect="light"
+                      class="table-rank-status"
+                    >
+                      {{ row.monitorRank ? `监控词第${row.monitorRank}名` : '监控词未出现' }}
+                    </el-tag>
+                    <div class="rank-track">
+                      <span class="rank-line"></span>
+                      <span
+                        v-for="brand in row.ranking.slice(0, 10)"
+                        :key="`${row.id}-${brand.rank}`"
+                        class="rank-dot"
+                        :class="{ active: brand.rank === row.monitorRank }"
+                      ></span>
+                    </div>
+                    <div class="rank-brand-list">
+                      <span v-for="brand in row.ranking.slice(0, 6)" :key="brand.name">{{ brand.name }} #{{ brand.rank }}</span>
+                    </div>
+                  </div>
+                </template>
+              </el-table-column>
+            <el-table-column label="日期" width="110">
+                <template #default="{ row }">{{ row.queryTime.slice(0, 10) }}</template>
+              </el-table-column>
+            </el-table>
+          </el-tab-pane>
+        </el-tabs>
+      </el-card>
+    </template>
+
     <template v-else-if="section === 'questions'">
       <div class="page-toolbar">
         <div>
@@ -927,6 +1021,71 @@
       </el-row>
     </template>
 
+    <el-dialog v-model="conversationDetailVisible" width="1180px" class="sentiment-conversation-dialog" top="3vh">
+      <template #header>
+        <div v-if="currentConversationRecord" class="conversation-dialog-meta">
+          <div>
+            <span>当前项目</span>
+            <strong>{{ currentProject.name }}</strong>
+          </div>
+          <p>{{ currentConversationRecord.queryTime }}</p>
+        </div>
+      </template>
+      <div v-if="currentConversationRecord" class="conversation-dialog-body">
+        <div class="conversation-dialog-layout">
+          <main class="conversation-answer-area">
+            <div class="conversation-question-row">
+              <div class="conversation-question-bubble">{{ currentConversationRecord.question }}</div>
+              <div class="conversation-question-icon">问</div>
+            </div>
+            <div class="conversation-answer-wrap">
+              <div class="conversation-model-avatar">{{ currentConversationRecord.modelIcon }}</div>
+              <div class="conversation-answer-card">
+                <div class="answer-title-row">
+                  <strong>{{ currentConversationRecord.model }}</strong>
+                  <el-tag type="success" effect="plain" size="small">成功</el-tag>
+                </div>
+                <div class="answer-time">执行时间：{{ currentConversationRecord.duration }}</div>
+                <div v-if="currentConversationRecord.thinkingProcess?.length" class="thinking-process">
+                  <div class="thinking-title">思考过程</div>
+                  <div v-for="(step, index) in currentConversationRecord.thinkingProcess" :key="index" class="thinking-step">
+                    <div class="thinking-dot"></div>
+                    <p>{{ step }}</p>
+                  </div>
+                </div>
+                <div class="conversation-answer-content">
+                  <p v-for="paragraph in currentConversationRecord.answerParagraphs" :key="paragraph">{{ paragraph }}</p>
+                </div>
+              </div>
+            </div>
+          </main>
+          <aside class="conversation-detail-side">
+            <section>
+              <h4>提及品牌（{{ currentConversationRecord.ranking.length }}个）</h4>
+              <div v-for="brand in currentConversationRecord.ranking" :key="brand.name" class="side-rank-item">
+                <span>{{ brand.name }}</span>
+                <b>{{ brand.rank }}</b>
+              </div>
+            </section>
+            <section>
+              <h4>引用来源（{{ currentConversationRecord.sources.length }}条）</h4>
+              <a
+                v-for="source in currentConversationRecord.sources"
+                :key="source.url"
+                class="source-item"
+                :href="source.url"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <strong>{{ source.title }}</strong>
+                <span>{{ source.url }}</span>
+              </a>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </el-dialog>
+
     <el-dialog v-model="subjectDialogVisible" title="监控主体配置" width="720px" destroy-on-close>
       <el-form :model="subjectForm" label-width="104px" class="subject-form">
         <el-row :gutter="14">
@@ -1166,6 +1325,12 @@ const isConfigSection = computed(() => section.value === 'config')
 const sourceTab = ref('domain')
 const sourceListKeyword = ref('')
 const sourceListPlatform = ref('')
+const conversationViewMode = ref('cards')
+const conversationKeyword = ref('')
+const conversationModelFilter = ref('')
+const conversationQuestionFilter = ref('')
+const conversationDetailVisible = ref(false)
+const currentConversationRecord = ref(null)
 const reportType = ref('daily')
 const keyword = ref('')
 const subjectEditing = ref(false)
@@ -1634,6 +1799,194 @@ const sourceCards = [
   { label: '待处理信源', value: '9', desc: '建议优先核查或补充澄清', type: 'primary' }
 ]
 
+const conversationRecords = [
+  {
+    id: 'C-052901',
+    model: '豆包',
+    modelIcon: '豆',
+    queryTime: '2026-06-02 09:18',
+    queryTimeText: '大约 10 小时前',
+    duration: '32.0 s',
+    question: '奥迪E7X与智己LS7换壳争议是否属实？',
+    answerSummary: '从平台共用、外观配置、品牌定位和官方披露角度分析争议，认为需要补充技术差异说明。',
+    sentiment: '负面',
+    brandCount: 8,
+    sourceCount: 6,
+    monitorRank: null,
+    thinkingProcess: [
+      '识别用户关心的是“换壳”是否属实，需要同时核查官方信息和第三方测评。',
+      '检索公开报道、汽车媒体测评和论坛讨论，提取平台、配置、价格和品牌定位差异。',
+      '综合官方说明与用户评论，判断争议核心在于技术来源披露和消费者预期落差。'
+    ],
+    answerParagraphs: [
+      '综合公开资料来看，奥迪E7X与智己LS7存在平台合作和部分技术共用背景，但仅用“换壳”概括会过于简单。',
+      '当前风险在于消费者对豪华品牌新能源产品的差异化预期较高，如果官方没有解释清楚底盘调校、智驾策略、服务体系和品牌定位差异，争议容易被简化传播。',
+      '建议优先补充技术差异说明、配置对照表和研发参与信息，并在高权重汽车媒体和社区中同步澄清。'
+    ],
+    ranking: [
+      { name: '上汽奥迪', rank: 1 },
+      { name: '智己汽车', rank: 2 },
+      { name: '奥迪', rank: 3 },
+      { name: '智己LS7', rank: 4 },
+      { name: '奥迪E7X', rank: 5 },
+      { name: '上汽集团', rank: 6 },
+      { name: '汽车之家', rank: 7 },
+      { name: '懂车帝', rank: 8 }
+    ],
+    sources: [
+      { title: '奥迪E7X与智己LS7平台参数对比引发讨论', url: 'https://www.autohome.com.cn/news/202605/29-audi-e7x-ls7.html' },
+      { title: '奥迪E7X是否只是智己LS7换标？评论区争议升温', url: 'https://www.dongchedi.com/article/7382910471201' },
+      { title: '如何看待奥迪E7X与智己LS7的平台共用争议', url: 'https://www.zhihu.com/question/20260529001' },
+      { title: '奥迪E7X上市传播遇网友质疑 官方回应仍待补充', url: 'https://auto.sohu.com/a/20260529-audi-e7x' },
+      { title: '奥迪E7X准车主汇总参数价格和配置表', url: 'https://club.autohome.com.cn/bbs/thread/20260529001' },
+      { title: '平台共用争议背后是品牌叙事与消费者预期落差', url: 'https://mp.weixin.qq.com/s/audi-e7x-20260529' }
+    ]
+  },
+  {
+    id: 'C-052902',
+    model: 'DeepSeek',
+    modelIcon: 'D',
+    queryTime: '2026-06-02 10:06',
+    queryTimeText: '大约 10 小时前',
+    duration: '45.6 s',
+    question: '奥迪E7X争议会不会影响用户购买？',
+    answerSummary: '判断争议会影响部分理性购车用户，尤其是关注价格溢价、技术来源和品牌差异的人群。',
+    sentiment: '负面',
+    brandCount: 7,
+    sourceCount: 5,
+    monitorRank: 1,
+    thinkingProcess: [
+      '拆解购买影响因素：价格、信任、技术差异、品牌溢价、交付体验。',
+      '检索社媒评论和汽车论坛讨论，识别高频风险表达。',
+      '评估争议对潜在购车用户的决策影响。'
+    ],
+    answerParagraphs: [
+      '该争议会对部分用户形成购买阻力，尤其是原本看重豪华品牌溢价和技术差异的用户。',
+      '如果后续官方能够清晰说明平台合作边界、奥迪参与研发内容和服务体验差异，影响可以被控制。',
+      '短期建议在购车咨询、媒体测评和社群问答中主动回应“为什么值得买”的核心问题。'
+    ],
+    ranking: [
+      { name: '奥迪E7X', rank: 1 },
+      { name: '智己LS7', rank: 2 },
+      { name: '上汽奥迪', rank: 3 },
+      { name: '智己汽车', rank: 4 },
+      { name: '汽车之家', rank: 5 },
+      { name: '小红书', rank: 6 },
+      { name: '今日头条', rank: 7 }
+    ],
+    sources: [
+      { title: '奥迪E7X是否只是智己LS7换标？评论区争议升温', url: 'https://www.dongchedi.com/article/7382910471201' },
+      { title: '奥迪E7X配置表和智己LS7有哪些相似点', url: 'https://www.xiaohongshu.com/explore/20260529-audi-e7x' },
+      { title: '豪华品牌新能源转型面临信任挑战', url: 'https://www.toutiao.com/article/7382910471202/' },
+      { title: '奥迪E7X准车主汇总参数价格和配置表', url: 'https://club.autohome.com.cn/bbs/thread/20260529001' },
+      { title: '奥迪E7X争议折射合资豪华新能源转型压力', url: 'https://weibo.com/auto-insight/20260529002' }
+    ]
+  },
+  {
+    id: 'C-052903',
+    model: '通义千问',
+    modelIcon: '通',
+    queryTime: '2026-06-02 11:15',
+    queryTimeText: '大约 9 小时前',
+    duration: '38.8 s',
+    question: '奥迪E7X与智己LS7有哪些关键差异？',
+    answerSummary: '回答从品牌定位、服务体系、调校策略、智能化配置和目标用户差异进行归纳。',
+    sentiment: '中性',
+    brandCount: 6,
+    sourceCount: 4,
+    monitorRank: 2,
+    thinkingProcess: [
+      '提取车型对比维度：品牌、配置、价格、技术、服务。',
+      '优先引用汽车媒体测评和公开参数资料。',
+      '形成差异化解释，避免直接强化负面标签。'
+    ],
+    answerParagraphs: [
+      '两款车型的差异不能只看平台和外观，还应比较品牌定位、售后服务、配置组合、智能驾驶策略和调校取向。',
+      '从舆情处置角度，品牌需要把这些差异转化为用户能理解的购买理由。',
+      '建议发布标准化 FAQ，回应“平台共用是否等于换壳”“价格差异来自哪里”等问题。'
+    ],
+    ranking: [
+      { name: '奥迪E7X', rank: 1 },
+      { name: '智己LS7', rank: 2 },
+      { name: '上汽奥迪', rank: 3 },
+      { name: '智己汽车', rank: 4 },
+      { name: '易车', rank: 5 },
+      { name: 'B站', rank: 6 }
+    ],
+    sources: [
+      { title: '公开参数拆解奥迪E7X和智己LS7差异', url: 'https://www.bilibili.com/video/BV20260529001' },
+      { title: '奥迪E7X实测：评论区仍追问换壳问题', url: 'https://news.yiche.com/hao/wenzhang/2026052901/' },
+      { title: '平台合作是常见模式 但差异点披露仍需加强', url: 'https://auto.163.com/26/0529/20/audi-e7x.html' },
+      { title: '奥迪E7X与智己LS7平台参数对比引发讨论', url: 'https://www.autohome.com.cn/news/202605/29-audi-e7x-ls7.html' }
+    ]
+  },
+  {
+    id: 'C-052904',
+    model: 'Kimi',
+    modelIcon: 'K',
+    queryTime: '2026-06-02 13:22',
+    queryTimeText: '大约 8 小时前',
+    duration: '29.4 s',
+    question: '奥迪E7X舆情现在最需要优先处理什么？',
+    answerSummary: '建议优先处理高权重信源、统一官方话术、补充技术差异证据并跟踪投诉平台。',
+    sentiment: '负面',
+    brandCount: 9,
+    sourceCount: 6,
+    monitorRank: null,
+    thinkingProcess: [
+      '识别当前风险传播渠道：汽车媒体、微博、论坛、投诉平台。',
+      '按权重区分高影响信源和普通讨论。',
+      '输出可执行的处置优先级。'
+    ],
+    answerParagraphs: [
+      '当前最需要处理的是高权重信源中的“换壳”叙事，因为它会被后续模型回答和媒体摘要反复引用。',
+      '建议优先发布技术差异说明，配合第三方测评、FAQ 和销售端统一口径。',
+      '同时应监测黑猫投诉、车质网、微博热搜和汽车论坛，防止争议从认知问题升级为投诉问题。'
+    ],
+    ranking: [
+      { name: '上汽奥迪', rank: 1 },
+      { name: '奥迪E7X', rank: 2 },
+      { name: '智己LS7', rank: 3 },
+      { name: '黑猫投诉', rank: 4 },
+      { name: '车质网', rank: 5 },
+      { name: '微博', rank: 6 },
+      { name: '汽车论坛', rank: 7 },
+      { name: '腾讯汽车', rank: 8 },
+      { name: '网易汽车', rank: 9 }
+    ],
+    sources: [
+      { title: '用户投诉宣传材料未充分说明车型技术来源', url: 'https://tousu.sina.com.cn/complaint/view/202605290001' },
+      { title: '奥迪E7X宣传与真实技术差异引关注', url: 'https://www.12365auto.com/news/20260529.shtml' },
+      { title: '换壳车值不值得买相关话题热度上升', url: 'https://weibo.com/hot/audi-e7x-topic' },
+      { title: '奥迪E7X争议下品牌方应补充技术差异说明', url: 'https://auto.qq.com/a/20260529/001.htm' },
+      { title: '平台合作是常见模式 但差异点披露仍需加强', url: 'https://auto.163.com/26/0529/20/audi-e7x.html' },
+      { title: '奥迪E7X准车主汇总参数价格和配置表', url: 'https://club.autohome.com.cn/bbs/thread/20260529001' }
+    ]
+  }
+]
+
+const conversationModels = computed(() => [...new Set(conversationRecords.map(item => item.model))])
+const conversationQuestions = computed(() => [...new Set(conversationRecords.map(item => item.question))])
+const filteredConversationRecords = computed(() => {
+  const keyword = conversationKeyword.value.trim().toLowerCase()
+  return conversationRecords.filter(item => {
+    const matchModel = !conversationModelFilter.value || item.model === conversationModelFilter.value
+    const matchQuestion = !conversationQuestionFilter.value || item.question === conversationQuestionFilter.value
+    const matchKeyword = !keyword || [
+      item.model,
+      item.question,
+      item.answerSummary,
+      item.sentiment,
+      ...item.answerParagraphs,
+      ...item.ranking.map(brand => brand.name),
+      ...item.sources.map(source => source.title)
+    ].some(value => String(value).toLowerCase().includes(keyword))
+    return matchModel && matchQuestion && matchKeyword
+  })
+})
+
+const conversationAnswerText = (row) => row.answerParagraphs.join('  ')
+
 const riskSources = [
   { source: '汽车论坛争议帖合集', url: 'auto-forum.example.com/audi-e7x', platform: '论坛', risk: '换壳争议被多模型引用', mentions: 9, models: '5个', level: '高', action: '优先核查' },
   { source: '短视频负面评论聚合', url: 'douyin.com/topic/e7x', platform: '抖音', risk: '质量质疑表达集中', mentions: 6, models: '4个', level: '高', action: '优先处理' },
@@ -2055,6 +2408,11 @@ const removeRiskKeyword = (row) => {
   riskKeywords.value = riskKeywords.value.filter(item => item.id !== row.id)
 }
 
+const openConversationDetail = (row) => {
+  currentConversationRecord.value = row
+  conversationDetailVisible.value = true
+}
+
 const addRiskCategory = () => {
   const name = riskCategoryForm.name.trim()
   if (name && !riskCategories.value.some(item => item.name === name)) {
@@ -2252,6 +2610,179 @@ const openReport = () => {
 .source-link { color: #2563eb; text-decoration: none; font-weight: 600; }
 .source-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .source-url { color: #64748b; font-weight: 500; }
+.conversation-manage-card { padding: 0; }
+.conversation-page-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+.conversation-model-select { width: 220px; }
+.conversation-export { margin-left: auto; }
+.conversation-tabs :deep(.el-tabs__header) { margin-bottom: 16px; }
+.conversation-card-filter { width: 320px; margin-bottom: 14px; }
+.conversation-card-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.conversation-preview-card {
+  min-height: 148px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.conversation-preview-card:hover { border-color: #93c5fd; box-shadow: 0 8px 18px rgba(37, 99, 235, .12); transform: translateY(-1px); }
+.conversation-preview-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.conversation-preview-title strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #111827; font-size: 14px; }
+.model-badge {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #e0e7ff;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 800;
+}
+.conversation-preview-card p {
+  flex: 1;
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.7;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.conversation-preview-meta { display: flex; justify-content: space-between; gap: 12px; color: #94a3b8; font-size: 12px; }
+.conversation-table-filters {
+  display: grid;
+  grid-template-columns: 260px 260px 72px;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.conversation-result-table {
+  border: 1px solid #edf2f7;
+  border-bottom: 0;
+}
+.conversation-result-table :deep(.el-table__row) { cursor: pointer; }
+.conversation-result-table :deep(.el-table__cell) { vertical-align: middle; }
+.table-answer-cell {
+  max-height: 120px;
+  overflow: hidden;
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.table-rank-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.table-rank-status {
+  width: fit-content;
+  align-self: center;
+  font-weight: 700;
+}
+.rank-track {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  align-items: center;
+  gap: 0;
+  padding: 0 4px;
+}
+.rank-line {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 50%;
+  height: 2px;
+  background: #d1d5db;
+  transform: translateY(-50%);
+}
+.rank-dot {
+  position: relative;
+  z-index: 1;
+  width: 7px;
+  height: 7px;
+  justify-self: center;
+  border-radius: 999px;
+  background: #c5cad3;
+}
+.rank-dot.active {
+  width: 12px;
+  height: 12px;
+  background: #10b981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, .12);
+}
+.rank-brand-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 36px;
+  overflow: hidden;
+}
+.rank-brand-list span {
+  padding: 1px 5px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  background: #fff;
+  color: #475569;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.conversation-dialog-meta { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin: 0; color: #8a95a6; }
+.conversation-dialog-meta div { display: flex; align-items: center; gap: 12px; }
+.conversation-dialog-meta span { font-size: 16px; font-weight: 800; color: #8a95a6; }
+.conversation-dialog-meta strong { color: #111827; font-size: 16px; }
+.conversation-dialog-meta p { margin: 0; color: #94a3b8; font-size: 13px; }
+.conversation-dialog-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 28px; align-items: start; }
+.conversation-answer-area { min-width: 0; }
+.conversation-question-row { display: flex; justify-content: flex-end; align-items: center; gap: 14px; margin: 0 28px 14px 0; }
+.conversation-question-bubble { max-width: 440px; padding: 16px 24px; border-radius: 10px; background: #3b9af8; color: #fff; font-weight: 800; line-height: 1.5; box-shadow: 0 12px 26px rgba(59, 154, 248, .18); }
+.conversation-question-icon { width: 54px; height: 54px; border-radius: 50%; background: #2994f6; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; }
+.conversation-answer-wrap { display: grid; grid-template-columns: 60px minmax(0, 1fr); gap: 16px; align-items: start; }
+.conversation-model-avatar { width: 48px; height: 48px; border-radius: 50%; background: #020617; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 20px; margin-top: 20px; }
+.conversation-answer-card { min-height: 430px; padding: 22px 26px; border: 1px solid #e5e7eb; border-radius: 10px; background: #f8fbff; box-shadow: 0 10px 24px rgba(15, 23, 42, .04); }
+.answer-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb; }
+.answer-title-row strong { color: #111827; font-size: 17px; }
+.answer-time { margin: 12px 0 14px; color: #8a95a6; font-size: 13px; }
+.thinking-process { margin: 12px 0 18px; padding: 14px 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
+.thinking-title { margin-bottom: 12px; color: #111827; font-weight: 800; }
+.thinking-step { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 12px; padding: 8px 0; color: #475569; line-height: 1.7; }
+.thinking-step p { margin: 0; }
+.thinking-dot { width: 7px; height: 7px; margin-top: 10px; border-radius: 50%; background: #94a3b8; }
+.conversation-answer-content { color: #334155; font-size: 14px; line-height: 1.9; }
+.conversation-answer-content p { margin: 0 0 12px; }
+.conversation-detail-side { display: grid; gap: 14px; max-height: 74vh; overflow: auto; padding-right: 4px; }
+.conversation-detail-side h4 { margin: 0 0 8px; color: #111827; font-size: 15px; }
+.side-rank-item { display: grid; grid-template-columns: minmax(0, 1fr) 34px; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid #e5e7eb; border-radius: 7px; background: #fff; color: #334155; }
+.side-rank-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-rank-item b { height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; background: #dbeafe; color: #2563eb; }
+.source-item { display: block; padding: 9px 10px; border: 1px solid #e5e7eb; border-radius: 7px; margin-bottom: 7px; background: #fff; color: inherit; text-decoration: none; cursor: pointer; transition: border-color .16s ease, box-shadow .16s ease, background .16s ease; }
+.source-item:hover { border-color: #93c5fd; background: #eff6ff; box-shadow: 0 6px 14px rgba(37, 99, 235, .12); }
+.source-item:hover strong { color: #2563eb; text-decoration: underline; text-underline-offset: 3px; }
+.source-item strong { display: block; color: #111827; font-size: 12px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.source-item span { display: block; margin-top: 4px; color: #64748b; font-size: 12px; line-height: 1.35; word-break: break-all; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+:deep(.sentiment-conversation-dialog .el-dialog__body) { max-height: 86vh; overflow: auto; padding: 0 18px 18px; }
+:deep(.sentiment-conversation-dialog .el-dialog__header) { padding: 10px 54px 6px 18px; margin-right: 0; min-height: 54px; display: flex; align-items: flex-start; }
+:deep(.sentiment-conversation-dialog .el-dialog__headerbtn) { top: 8px; }
+:deep(.sentiment-conversation-dialog .el-dialog__title) { display: none; }
 .page-toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
 .page-toolbar h2 { margin: 0 0 6px; font-size: 20px; color: #111827; }
 .page-toolbar p { margin: 0; color: #64748b; font-size: 13px; }

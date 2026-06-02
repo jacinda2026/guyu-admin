@@ -320,6 +320,7 @@
 
       <template #footer>
         <div class="dialog-footer">
+          <span class="billing-cost-tip">基础模型费用消耗: ¥0.10/问题/次/模型</span>
           <el-button @click="createDialogVisible = false">取消</el-button>
           <el-button type="primary" @click="saveCreateProject">保存</el-button>
         </div>
@@ -986,7 +987,8 @@ const saveCreateProject = async () => {
 .model-children { margin-top: 12px; padding-top: 10px; border-top: 1px solid #bfdbfe; display: flex; flex-direction: column; gap: 8px; }
 .model-children :deep(.el-checkbox) { margin-right: 0; }
 .screenshot-checks { display: flex; gap: 14px; flex-wrap: wrap; }
-.dialog-footer { display: flex; justify-content: center; gap: 18px; }
+.dialog-footer { display: flex; justify-content: center; align-items: center; gap: 18px; }
+.billing-cost-tip { color: #64748b; font-size: 13px; white-space: nowrap; }
 
 
 .project-name-section {

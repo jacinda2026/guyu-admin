@@ -40,6 +40,7 @@
           <el-menu-item :index="`/sentiment-project/${projectId}/overview`">舆情概览</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/sources`">信源列表</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/risk-sources`">风险信源</el-menu-item>
+          <el-menu-item :index="`/sentiment-project/${projectId}/conversations`">对话管理</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/questions`">舆情问题</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/tasks`">监控任务</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/reports`">舆情报告</el-menu-item>
@@ -115,6 +116,7 @@ const pageTitleMap = {
   overview: '舆情概览',
   sources: '信源列表',
   'risk-sources': '风险信源',
+  conversations: '对话管理',
   questions: '舆情问题',
   tasks: '监控任务',
   reports: '舆情报告',

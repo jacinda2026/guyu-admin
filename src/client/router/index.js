@@ -131,7 +131,7 @@ const routes = [
       { path: 'config/issue', name: 'SentimentProjectConfigIssue', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '舆情问题配置', configPage: 'issue' } },
       { path: 'config/monitor', name: 'SentimentProjectConfigMonitor', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '监控配置', configPage: 'monitor' } },
       { path: 'config/alert', name: 'SentimentProjectConfigAlert', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '预警配置', configPage: 'alert' } },
-      { path: ':section(overview|sources|risk-sources|questions|tasks|reports)', name: 'SentimentProjectSection', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '舆情项目' } }
+      { path: ':section(overview|sources|risk-sources|conversations|questions|tasks|reports)', name: 'SentimentProjectSection', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '舆情项目' } }
     ]
   },
   {
