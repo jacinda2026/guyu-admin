@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-container class="sentiment-project-layout">
     <el-aside :width="asideWidth" class="project-aside" :class="{ 'is-collapsed': isMenuCollapsed }">
       <el-dropdown trigger="click" class="project-switcher" @command="switchProject">
@@ -39,6 +39,7 @@
           </template>
           <el-menu-item :index="`/sentiment-project/${projectId}/overview`">舆情概览</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/sources`">信源列表</el-menu-item>
+          <el-menu-item :index="`/sentiment-project/${projectId}/question-list`">问题列表</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/risk-sources`">风险信源</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/conversations`">对话管理</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/questions`">舆情问题</el-menu-item>
@@ -74,7 +75,15 @@
             <el-breadcrumb-item>
               <button type="button" class="breadcrumb-link" @click="goSentimentList">舆情监控</button>
             </el-breadcrumb-item>
-            <el-breadcrumb-item>{{ currentPageTitle }}</el-breadcrumb-item>
+            <el-breadcrumb-item v-if="isQuestionDetailPage">
+              <button type="button" class="breadcrumb-link" @click="goQuestionList">问题列表</button>
+            </el-breadcrumb-item>
+            <el-breadcrumb-item v-else-if="isClueDetailPage">
+              <button type="button" class="breadcrumb-link" @click="goOverview">舆情线索池</button>
+            </el-breadcrumb-item>
+            <el-breadcrumb-item v-else>{{ currentPageTitle }}</el-breadcrumb-item>
+            <el-breadcrumb-item v-if="isQuestionDetailPage">问题</el-breadcrumb-item>
+            <el-breadcrumb-item v-if="isClueDetailPage">线索</el-breadcrumb-item>
           </el-breadcrumb>
         </div>
         <div class="header-right">
@@ -115,6 +124,9 @@ const projectOptions = [
 const pageTitleMap = {
   overview: '舆情概览',
   sources: '信源列表',
+  'question-list': '问题列表',
+  'question-detail': '问题详情',
+  'clue-detail': '线索详情',
   'risk-sources': '风险信源',
   conversations: '对话管理',
   questions: '舆情问题',
@@ -133,6 +145,8 @@ const configPageTitleMap = {
 
 const projectId = computed(() => route.params.id || 'SEN-MOCK-AUDI')
 const currentProjectName = computed(() => projectOptions.find(project => project.id === projectId.value)?.name || '舆情监控项目')
+const isQuestionDetailPage = computed(() => route.params.section === 'question-detail')
+const isClueDetailPage = computed(() => route.params.section === 'clue-detail')
 const currentPageTitle = computed(() => {
   if (route.meta.configPage) return configPageTitleMap[route.meta.configPage] || '配置中心'
   return pageTitleMap[route.params.section] || route.meta.title || '舆情概览'
@@ -158,6 +172,14 @@ const switchProject = (targetProjectId) => {
 
 const goSentimentList = () => {
   router.push('/projects/sentiment')
+}
+
+const goQuestionList = () => {
+  router.push(`/sentiment-project/${projectId.value}/question-list`)
+}
+
+const goOverview = () => {
+  router.push(`/sentiment-project/${projectId.value}/overview`)
 }
 </script>
 

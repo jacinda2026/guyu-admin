@@ -1,57 +1,57 @@
-import { createRouter, createWebHashHistory } from 'vue-router'
-import ClientLayout from '../layout/ClientLayout.vue' // 确保你的主外壳组件存在
-import ProjectLayout from '../layout/ProjectLayout.vue' // 🌟 引入刚写好的项目专属壳子
+﻿import { createRouter, createWebHashHistory } from 'vue-router'
+import ClientLayout from '../layout/ClientLayout.vue'
+import ProjectLayout from '../layout/ProjectLayout.vue'
 import SentimentProjectLayout from '../layout/SentimentProjectLayout.vue'
 import OpinionProjectLayout from '../layout/OpinionProjectLayout.vue'
 const routes = [
   {
     path: '/',
     component: ClientLayout,
-    redirect: '/reports/hotel', // 默认进入酒店工单列表
+    redirect: '/reports/hotel', // 榛樿杩涘叆閰掑簵宸ュ崟鍒楄〃
     children: [
       {
         path: 'report', 
         name: 'GeoDiagnosis',
         component: () => import('../views/GeoDiagnosis.vue'),
-        meta: { title: '发起 AI 诊断' }
+        meta: { title: '鍙戣捣 AI 璇婃柇' }
       },
-      // 🌟 新增：项目中心路由节点
+      // 馃専 鏂板锛氶」鐩腑蹇冭矾鐢辫妭鐐?
       {
         path: 'projects',
         name: 'ProjectCenter',
         component: () => import('../views/ProjectCenter.vue'),
-        meta: { title: '品牌监控' }
+        meta: { title: '鍝佺墝鐩戞帶' }
       },
       {
         path: 'projects/sentiment',
         name: 'ProjectSentimentCenter',
         component: () => import('../views/SentimentReportManagement.vue'),
-        meta: { title: '舆情监控' }
+        meta: { title: '鑸嗘儏鐩戞帶' }
       },
       {
         path: 'projects/opinion-deepdive',
         name: 'OpinionDeepDiveSystem',
         component: () => import('../views/opinion/OpinionProjectCenter.vue'),
-        meta: { title: 'AI 全域舆情深钻系统' }
+        meta: { title: 'AI 鍏ㄥ煙鑸嗘儏娣遍捇绯荤粺' }
       },
       {
         path: 'intelligence',
         name: 'SmartCenter',
         component: () => import('../views/SmartCenter.vue'),
-        meta: { title: '智能中心' }
+        meta: { title: '鏅鸿兘涓績' }
       },
-      // 报告管理中心独立的二级树状子路由
+      // 鎶ュ憡绠＄悊涓績鐙珛鐨勪簩绾ф爲鐘跺瓙璺敱
       {
         path: 'reports',
         name: 'ReportManagementParent',
         redirect: '/reports/hotel',
-        meta: { title: '报告管理中心' },
+        meta: { title: '鎶ュ憡绠＄悊涓績' },
         children: [
           {
             path: 'hotel',
             name: 'HotelReportManagement',
             component: () => import('../views/HotelReportManagement.vue'),
-            meta: { title: '酒店单店诊断项目' }
+            meta: { title: '閰掑簵鍗曞簵璇婃柇椤圭洰' }
           },
           {
             path: 'brand',
@@ -59,12 +59,12 @@ const routes = [
             component: () => import('../views/BrandReportManagement.vue'),
             meta: { title: '品牌全域健康度检测' }
           },
-          // 🌟 新增：全域舆情监测三级子路由节点
+          // 馃専 鏂板锛氬叏鍩熻垎鎯呯洃娴嬩笁绾у瓙璺敱鑺傜偣
           {
             path: 'sentiment',
             name: 'SentimentReportManagement',
             component: () => import('../views/SentimentReportManagement.vue'),
-            meta: { title: '全域舆情监测系统' }
+            meta: { title: '鍏ㄥ煙鑸嗘儏鐩戞祴绯荤粺' }
           }
         ]
       },
@@ -73,7 +73,7 @@ const routes = [
         path: 'billing',
         name: 'BillingCenter',
         redirect: '/billing/recharge',
-        meta: { title: '账户中心' },
+        meta: { title: '璐︽埛涓績' },
         children: [
           {
             path: 'recharge',
@@ -85,38 +85,38 @@ const routes = [
             path: 'details',
             name: 'BillingDetails',
             component: () => import('../views/billing/BillingDetails.vue'),
-            meta: { title: '费用详情' }
+            meta: { title: '璐圭敤璇︽儏' }
           }
         ]
       },
     ]
   },
-  // 🌟 新增：独立的项目专属工作台路由 (顶级路由)
+  // 馃専 鏂板锛氱嫭绔嬬殑椤圭洰涓撳睘宸ヤ綔鍙拌矾鐢?(椤剁骇璺敱)
   {
-    path: '/project/:id', // 这里的 :id 是项目ID参数
+    path: '/project/:id', // 杩欓噷鐨?:id 鏄」鐩甀D鍙傛暟
     component: ProjectLayout,
     redirect: to => { return `/project/${to.params.id}/dashboard` },
     children: [
-      // 1. 数据中心
-      { path: 'dashboard', name: 'ProjectDataOverview', component: () => import('../views/project/DataOverview.vue'), meta: { title: '数据概览' } },
-      { path: 'sources', name: 'ProjectSources', component: () => import('../views/project/ProjectSources.vue'), meta: { title: '信源统计' } },
-      { path: 'monitor', name: 'ProjectMonitor', component: () => import('../views/project/ProblemMonitor.vue'), meta: { title: '问题监控' } },
-      { path: 'monitor/:questionId', name: 'ProjectMonitorQuestionDetail', component: () => import('../views/project/ProblemMonitor.vue'), meta: { title: '监控问题概览' } },
-      { path: 'tasks', name: 'ProjectMonitorTasks', component: () => import('../views/project/MonitorTasks.vue'), meta: { title: '监控任务' } },
-      { path: 'tasks/:taskId', name: 'ProjectMonitorTaskDetail', component: () => import('../views/project/MonitorTasks.vue'), meta: { title: '监控任务详情' } },
-      { path: 'exports', name: 'ProjectExportCenter', component: () => import('../views/project/ExportCenter.vue'), meta: { title: '导出中心' } },
+      // 1. 鏁版嵁涓績
+      { path: 'dashboard', name: 'ProjectDataOverview', component: () => import('../views/project/DataOverview.vue'), meta: { title: '鏁版嵁姒傝' } },
+      { path: 'sources', name: 'ProjectSources', component: () => import('../views/project/ProjectSources.vue'), meta: { title: '淇℃簮缁熻' } },
+      { path: 'monitor', name: 'ProjectMonitor', component: () => import('../views/project/ProblemMonitor.vue'), meta: { title: '闂鐩戞帶' } },
+      { path: 'monitor/:questionId', name: 'ProjectMonitorQuestionDetail', component: () => import('../views/project/ProblemMonitor.vue'), meta: { title: '鐩戞帶闂姒傝' } },
+      { path: 'tasks', name: 'ProjectMonitorTasks', component: () => import('../views/project/MonitorTasks.vue'), meta: { title: '鐩戞帶浠诲姟' } },
+      { path: 'tasks/:taskId', name: 'ProjectMonitorTaskDetail', component: () => import('../views/project/MonitorTasks.vue'), meta: { title: '鐩戞帶浠诲姟璇︽儏' } },
+      { path: 'exports', name: 'ProjectExportCenter', component: () => import('../views/project/ExportCenter.vue'), meta: { title: '瀵煎嚭涓績' } },
       
-      // 2. 素材中心
-      { path: 'articles', name: 'ProjectArticles', component: () => import('../views/project/Placeholder.vue'), meta: { title: '发布文章' } },
+      // 2. 绱犳潗涓績
+      { path: 'articles', name: 'ProjectArticles', component: () => import('../views/project/Placeholder.vue'), meta: { title: '鍙戝竷鏂囩珷' } },
       { path: 'knowledge', name: 'ProjectKnowledge', component: () => import('../views/project/Placeholder.vue'), meta: { title: '知识库' } },
       { path: 'materials', name: 'ProjectMaterials', component: () => import('../views/project/Placeholder.vue'), meta: { title: '素材库' } },
       
-      // 3. 配置中心
-      { path: 'config/issue', name: 'ConfigIssue', component: () => import('../views/project/QuestionConfig.vue'), meta: { title: '问题配置' } },
-      { path: 'config/competitor', name: 'ConfigCompetitor', component: () => import('../views/project/CompetitorConfig.vue'), meta: { title: '竞品配置' } },
-      { path: 'config/monitor', name: 'ConfigMonitor', component: () => import('../views/project/MonitorConfig.vue'), meta: { title: '监控配置' } },
+      // 3. 閰嶇疆涓績
+      { path: 'config/issue', name: 'ConfigIssue', component: () => import('../views/project/QuestionConfig.vue'), meta: { title: '闂閰嶇疆' } },
+      { path: 'config/competitor', name: 'ConfigCompetitor', component: () => import('../views/project/CompetitorConfig.vue'), meta: { title: '绔炲搧閰嶇疆' } },
+      { path: 'config/monitor', name: 'ConfigMonitor', component: () => import('../views/project/MonitorConfig.vue'), meta: { title: '鐩戞帶閰嶇疆' } },
       
-      // 4. 智能体
+      // 4. 鏅鸿兘浣?
       { path: 'agent', name: 'ProjectAgent', component: () => import('../views/project/Placeholder.vue'), meta: { title: '智能体' } }
     ]
   },
@@ -126,12 +126,12 @@ const routes = [
     redirect: to => `/sentiment-project/${to.params.id}/overview`,
     children: [
       { path: 'config', redirect: to => `/sentiment-project/${to.params.id}/config/subject` },
-      { path: 'config/subject', name: 'SentimentProjectConfigSubject', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '监控主体', configPage: 'subject' } },
-      { path: 'config/risk', name: 'SentimentProjectConfigRisk', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '风险词库', configPage: 'risk' } },
-      { path: 'config/issue', name: 'SentimentProjectConfigIssue', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '舆情问题配置', configPage: 'issue' } },
-      { path: 'config/monitor', name: 'SentimentProjectConfigMonitor', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '监控配置', configPage: 'monitor' } },
-      { path: 'config/alert', name: 'SentimentProjectConfigAlert', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '预警配置', configPage: 'alert' } },
-      { path: ':section(overview|sources|risk-sources|conversations|questions|tasks|reports)', name: 'SentimentProjectSection', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '舆情项目' } }
+      { path: 'config/subject', name: 'SentimentProjectConfigSubject', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '鐩戞帶涓讳綋', configPage: 'subject' } },
+      { path: 'config/risk', name: 'SentimentProjectConfigRisk', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '椋庨櫓璇嶅簱', configPage: 'risk' } },
+      { path: 'config/issue', name: 'SentimentProjectConfigIssue', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '鑸嗘儏闂閰嶇疆', configPage: 'issue' } },
+      { path: 'config/monitor', name: 'SentimentProjectConfigMonitor', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '鐩戞帶閰嶇疆', configPage: 'monitor' } },
+      { path: 'config/alert', name: 'SentimentProjectConfigAlert', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '棰勮閰嶇疆', configPage: 'alert' } },
+      { path: ':section(overview|sources|question-list|question-detail|clue-detail|risk-sources|conversations|questions|tasks|reports)', name: 'SentimentProjectSection', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '鑸嗘儏椤圭洰' } }
     ]
   },
   {
