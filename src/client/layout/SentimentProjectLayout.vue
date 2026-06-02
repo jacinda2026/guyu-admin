@@ -38,6 +38,7 @@
             <div class="group-title"><el-icon><DataBoard /></el-icon> 舆情项目</div>
           </template>
           <el-menu-item :index="`/sentiment-project/${projectId}/overview`">舆情概览</el-menu-item>
+          <el-menu-item :index="`/sentiment-project/${projectId}/sources`">信源列表</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/risk-sources`">风险信源</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/questions`">舆情问题</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/tasks`">监控任务</el-menu-item>
@@ -48,7 +49,11 @@
           <template #title>
             <div class="group-title"><el-icon><Setting /></el-icon> 配置中心</div>
           </template>
-          <el-menu-item :index="`/sentiment-project/${projectId}/config`">配置中心</el-menu-item>
+          <el-menu-item :index="`/sentiment-project/${projectId}/config/subject`">监控主体</el-menu-item>
+          <el-menu-item :index="`/sentiment-project/${projectId}/config/risk`">风险词库</el-menu-item>
+          <el-menu-item :index="`/sentiment-project/${projectId}/config/issue`">舆情问题配置</el-menu-item>
+          <el-menu-item :index="`/sentiment-project/${projectId}/config/monitor`">监控配置</el-menu-item>
+          <el-menu-item :index="`/sentiment-project/${projectId}/config/alert`">预警配置</el-menu-item>
         </el-menu-item-group>
       </el-menu>
     </el-aside>
@@ -84,7 +89,7 @@
       </el-header>
 
       <el-main class="project-main-bg">
-        <router-view />
+        <router-view :key="route.fullPath" />
       </el-main>
     </el-container>
   </el-container>
@@ -108,6 +113,7 @@ const projectOptions = [
 
 const pageTitleMap = {
   overview: '舆情概览',
+  sources: '信源列表',
   'risk-sources': '风险信源',
   questions: '舆情问题',
   tasks: '监控任务',
@@ -115,9 +121,20 @@ const pageTitleMap = {
   config: '配置中心'
 }
 
+const configPageTitleMap = {
+  subject: '监控主体',
+  risk: '风险词库',
+  issue: '舆情问题配置',
+  monitor: '监控配置',
+  alert: '预警配置'
+}
+
 const projectId = computed(() => route.params.id || 'SEN-MOCK-AUDI')
 const currentProjectName = computed(() => projectOptions.find(project => project.id === projectId.value)?.name || '舆情监控项目')
-const currentPageTitle = computed(() => pageTitleMap[route.params.section] || route.meta.title || '舆情概览')
+const currentPageTitle = computed(() => {
+  if (route.meta.configPage) return configPageTitleMap[route.meta.configPage] || '配置中心'
+  return pageTitleMap[route.params.section] || route.meta.title || '舆情概览'
+})
 
 const toggleMenu = () => {
   isMenuCollapsed.value = !isMenuCollapsed.value
@@ -125,6 +142,14 @@ const toggleMenu = () => {
 
 const switchProject = (targetProjectId) => {
   if (!targetProjectId || targetProjectId === projectId.value) return
+  if (route.meta.configPage) {
+    router.push(`/sentiment-project/${targetProjectId}/config/${route.meta.configPage}`)
+    return
+  }
+  if (route.params.section === 'sources') {
+    router.push(`/sentiment-project/${targetProjectId}/sources`)
+    return
+  }
   const section = route.params.section || 'overview'
   router.push(`/sentiment-project/${targetProjectId}/${section}`)
 }

@@ -125,7 +125,13 @@ const routes = [
     component: SentimentProjectLayout,
     redirect: to => `/sentiment-project/${to.params.id}/overview`,
     children: [
-      { path: ':section(overview|risk-sources|questions|tasks|reports|config)', name: 'SentimentProjectSection', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '舆情项目' } }
+      { path: 'config', redirect: to => `/sentiment-project/${to.params.id}/config/subject` },
+      { path: 'config/subject', name: 'SentimentProjectConfigSubject', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '监控主体', configPage: 'subject' } },
+      { path: 'config/risk', name: 'SentimentProjectConfigRisk', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '风险词库', configPage: 'risk' } },
+      { path: 'config/issue', name: 'SentimentProjectConfigIssue', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '舆情问题配置', configPage: 'issue' } },
+      { path: 'config/monitor', name: 'SentimentProjectConfigMonitor', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '监控配置', configPage: 'monitor' } },
+      { path: 'config/alert', name: 'SentimentProjectConfigAlert', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '预警配置', configPage: 'alert' } },
+      { path: ':section(overview|sources|risk-sources|questions|tasks|reports)', name: 'SentimentProjectSection', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '舆情项目' } }
     ]
   },
   {
