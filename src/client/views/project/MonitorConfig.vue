@@ -222,7 +222,8 @@
       </div>
 
       <div class="config-section metric-section">
-        <div class="section-title">监控指标</div>
+        <div class="section-title">监控达标规则</div>
+        <div class="section-desc">设置项目的监控结果判断标准，用于判断每次任务、日报、周报、月报是否达标。</div>
         <div class="metric-grid">
           <div class="metric-item">
             <el-checkbox v-model="metrics.mentionRate" :disabled="!editing">提及率</el-checkbox>
@@ -260,14 +261,6 @@
         </div>
       </div>
 
-      <div class="config-section report-section">
-        <div class="section-title">监控报告</div>
-        <div class="report-options">
-          <el-checkbox v-model="reports.daily" :disabled="!editing">日报</el-checkbox>
-          <el-checkbox v-model="reports.weekly" :disabled="!editing">周报</el-checkbox>
-          <el-checkbox v-model="reports.monthly" :disabled="!editing">月报</el-checkbox>
-        </div>
-      </div>
     </section>
   </div>
 </template>
@@ -426,7 +419,6 @@ watch(
     }
   }
 )
-const reports = reactive({ daily: false, weekly: true, monthly: false })
 </script>
 
 <style scoped>
@@ -472,11 +464,17 @@ const reports = reactive({ daily: false, weekly: true, monthly: false })
   padding-left: 10px;
   font-size: 20px;
   font-weight: 700;
-  margin-bottom: 22px;
+  margin-bottom: 10px;
   display: flex;
   align-items: center;
   gap: 14px;
   line-height: 1;
+}
+
+.section-desc {
+  margin: 0 0 18px 14px;
+  color: #8a95a6;
+  font-size: 13px;
 }
 
 .basic-row {
@@ -986,13 +984,6 @@ const reports = reactive({ daily: false, weekly: true, monthly: false })
   width: 100px;
 }
 
-.report-options {
-  display: grid;
-  grid-template-columns: repeat(3, 120px);
-  gap: 20px;
-  padding-left: 34px;
-}
-
 :deep(.el-checkbox),
 :deep(.el-radio) {
   color: #243244;
@@ -1082,8 +1073,7 @@ const reports = reactive({ daily: false, weekly: true, monthly: false })
 
   .basic-row,
   .model-grid,
-  .metric-grid,
-  .report-options {
+  .metric-grid {
     padding-left: 12px;
   }
 

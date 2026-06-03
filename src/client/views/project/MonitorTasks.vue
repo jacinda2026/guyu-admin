@@ -62,6 +62,10 @@
             <el-option label="定时任务" value="schedule" />
             <el-option label="复测任务" value="retest" />
           </el-select>
+          <el-button type="primary" size="small" @click="openManualReportDialog">
+            <el-icon><Timer /></el-icon>
+            生成报告
+          </el-button>
         </div>
       </div>
 
@@ -103,24 +107,31 @@
         <div class="section-header">
           <div>
             <span class="section-title">监控报告</span>
-            <span class="section-subtitle">日报、周报、月报都展示指标是否达标，并支持导出报告</span>
+            <span class="section-subtitle">报告保存 30 天，生成后请尽快下载</span>
           </div>
+          <el-select v-model="reportTypeFilter" size="small" style="width: 140px">
+            <el-option label="全部报告类型" value="all" />
+            <el-option label="日报" value="daily" />
+            <el-option label="周报" value="weekly" />
+            <el-option label="月报" value="monthly" />
+            <el-option label="自定义时间段" value="custom" />
+          </el-select>
         </div>
       </template>
-      <el-tabs v-model="activeReportType" class="report-tabs">
-        <el-tab-pane label="日报" name="daily" />
-        <el-tab-pane label="周报" name="weekly" />
-        <el-tab-pane label="月报" name="monthly" />
-      </el-tabs>
-      <el-table :data="currentReports" class="report-table" style="width: 100%" :header-cell-style="headerCellStyle">
-        <el-table-column prop="period" label="周期" min-width="150" />
-        <el-table-column label="提及率" width="110" align="center">
+      <el-table :data="filteredReports" class="report-table" style="width: 100%" :header-cell-style="headerCellStyle">
+        <el-table-column label="报告类型" width="112" align="center">
+          <template #default="{ row }">
+            <el-tag effect="plain" size="small">{{ reportTypeText[row.type] }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="period" label="周期" min-width="160" />
+        <el-table-column label="提及率" width="88" align="center">
           <template #default="{ row }"><span :class="row.mentionPassed ? 'pass-text' : 'fail-text'">{{ row.mentionRate }}%</span></template>
         </el-table-column>
-        <el-table-column label="平均顺位" width="110" align="center">
+        <el-table-column label="平均顺位" width="92" align="center">
           <template #default="{ row }"><span :class="row.rankPassed ? 'pass-text' : 'fail-text'">{{ row.avgRank }}</span></template>
         </el-table-column>
-        <el-table-column prop="runCount" label="任务数" width="90" align="center" />
+        <el-table-column prop="runCount" label="任务数" width="80" align="center" />
         <el-table-column v-if="isMonthlyDaysEnabled" label="达标天数" width="110" align="center">
           <template #default="{ row }">{{ row.qualifiedDays ?? '-' }}</template>
         </el-table-column>
@@ -130,11 +141,106 @@
             <span class="report-summary">{{ row.summary }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="90" align="center">
-          <template #default="{ row }"><el-button link type="primary" @click="handleExportReport(activeReportType, row)">导出</el-button></template>
+        <el-table-column label="状态" width="92" align="center">
+          <template #default="{ row }">
+            <el-tag :type="reportStatusMeta[row.status].type" effect="plain" size="small">{{ reportStatusMeta[row.status].text }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="createdAt" label="创建时间" width="150" />
+        <el-table-column prop="completedAt" label="完成时间" width="150" />
+        <el-table-column label="操作" width="108" align="center">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="handleViewReport(row)">查看</el-button>
+            <el-button link type="primary" :disabled="row.status !== 'done'" @click="handleExportReport(row.type, row)">下载</el-button>
+          </template>
         </el-table-column>
       </el-table>
     </el-card>
+
+    <el-dialog v-model="manualReportVisible" width="640px" class="manual-report-dialog">
+      <template #header>
+        <div class="manual-report-title-row">
+          <span>生成报告</span>
+          <em>报告保存 30 天，生成后请尽快下载</em>
+        </div>
+      </template>
+      <el-form label-position="top" class="manual-report-form">
+        <el-form-item class="manual-report-section no-label">
+          <div class="report-type-grid">
+            <button
+              v-for="item in manualReportTypeOptions"
+              :key="item.value"
+              type="button"
+              class="report-type-card"
+              :class="{ active: manualReportForm.type === item.value }"
+              @click="manualReportForm.type = item.value"
+            >
+              <strong>{{ item.label }}</strong>
+              <span>{{ item.desc }}</span>
+            </button>
+          </div>
+        </el-form-item>
+        <el-form-item label="统计时间" class="manual-report-section">
+          <div class="manual-time-box">
+            <el-date-picker
+              v-if="manualReportForm.type === 'daily'"
+              v-model="manualReportForm.day"
+              type="date"
+              value-format="YYYY-MM-DD"
+              :disabled-date="disableFutureDate"
+              placeholder="选择哪一天"
+              style="width: 240px"
+            />
+            <div v-else-if="manualReportForm.type === 'weekly'" class="time-picker-row">
+              <el-date-picker
+                v-model="manualReportForm.weekDate"
+                type="week"
+                format="YYYY 第 ww 周"
+                value-format="YYYY-MM-DD"
+                :disabled-date="disableFutureDate"
+                placeholder="选择哪一周"
+                style="width: 240px"
+              />
+              <span class="week-range-preview">{{ manualReportWeekRangeText }}</span>
+            </div>
+            <div v-else-if="manualReportForm.type === 'monthly'" class="time-picker-row">
+              <el-date-picker
+                v-model="manualReportForm.month"
+                type="month"
+                value-format="YYYY-MM"
+                :disabled-date="disableFutureDate"
+                placeholder="选择哪一月"
+                style="width: 240px"
+              />
+              <span class="week-range-preview">{{ manualReportMonthRangeText }}</span>
+            </div>
+            <el-date-picker
+              v-else
+              v-model="manualReportForm.customRange"
+              type="daterange"
+              range-separator="至"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+              value-format="YYYY-MM-DD"
+              :disabled-date="disableFutureDate"
+              style="width: 320px"
+            />
+          </div>
+        </el-form-item>
+        <div class="manual-report-tip">
+          将按 {{ manualReportPeriodText }} 汇总任务结果并创建报告生成任务，完成后可在监控报告或导出中心查看。
+        </div>
+      </el-form>
+      <template #footer>
+        <div class="manual-report-footer">
+          <span class="report-cost-tip">生成一份报告将消耗: ¥5.00</span>
+          <div class="manual-report-actions">
+            <el-button @click="manualReportVisible = false">取消</el-button>
+            <el-button type="primary" @click="handleCreateManualReport">确认生成</el-button>
+          </div>
+        </div>
+      </template>
+    </el-dialog>
 
     </template>
 
@@ -601,15 +707,17 @@ const runCollectConfig = computed(() => {
 
 const route = useRoute()
 const router = useRouter()
+const currentProjectName = '卓牧羊奶粉项目'
 const keyword = ref('')
 const activeStatus = ref('all')
 const triggerType = ref('all')
 const dateRange = ref([])
-const activeReportType = ref('daily')
+const reportTypeFilter = ref('all')
 const detailVisible = ref(false)
 const retestVisible = ref(false)
 const conversationVisible = ref(false)
 const screenshotVisible = ref(false)
+const manualReportVisible = ref(false)
 const activeTaskDetailTab = ref('questions')
 const currentTask = ref(null)
 const currentRetest = ref(null)
@@ -623,14 +731,112 @@ const questionPageSize = ref(20)
 const retestPage = ref(1)
 const retestPageSize = ref(20)
 const retestForm = ref({ rounds: 3, metric: 'mention', stopOnFirstPass: true })
+const formatDateText = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+const getDateText = (offset = 0) => {
+  const date = new Date()
+  date.setDate(date.getDate() + offset)
+  return formatDateText(date)
+}
+const parseDateText = (value) => {
+  if (!value) return null
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return null
+  return new Date(year, month - 1, day)
+}
+const todayStart = () => {
+  const date = new Date()
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+const minDate = (left, right) => left.getTime() <= right.getTime() ? left : right
+const disableFutureDate = (date) => date.getTime() > todayStart().getTime()
+const getWeekRange = (value) => {
+  const date = parseDateText(value)
+  if (!date) return []
+  const day = date.getDay()
+  const mondayOffset = day === 0 ? -6 : 1 - day
+  const start = new Date(date)
+  start.setDate(date.getDate() + mondayOffset)
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+  return [formatDateText(start), formatDateText(minDate(end, todayStart()))]
+}
+const getMonthRange = (value) => {
+  if (!value) return []
+  const [year, month] = value.split('-').map(Number)
+  if (!year || !month) return []
+  const start = new Date(year, month - 1, 1)
+  const end = new Date(year, month, 0)
+  return [formatDateText(start), formatDateText(minDate(end, todayStart()))]
+}
+const getMonthText = () => getDateText().slice(0, 7)
+const getDateTimeText = () => {
+  const date = new Date()
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${formatDateText(date)} ${hours}:${minutes}`
+}
+const manualReportForm = ref({
+  type: 'daily',
+  day: getDateText(),
+  weekDate: getDateText(),
+  month: getMonthText(),
+  customRange: [getDateText(-6), getDateText()]
+})
 
 const statusMeta = {
   running: { text: '执行中', type: 'warning' },
   done: { text: '已完成', type: 'success' },
   failed: { text: '失败', type: 'danger' }
 }
+const reportStatusMeta = {
+  generating: { text: '生成中', type: 'warning' },
+  done: { text: '已完成', type: 'success' },
+  failed: { text: '失败', type: 'danger' }
+}
 
-const reportTypeText = { daily: '日报', weekly: '周报', monthly: '月报' }
+const reportTypeText = { daily: '日报', weekly: '周报', monthly: '月报', custom: '自定义时间段' }
+const manualReportTypeOptions = [
+  { value: 'daily', label: '日报', desc: '按单日生成' },
+  { value: 'weekly', label: '周报', desc: '周一到周日' },
+  { value: 'monthly', label: '月报', desc: '按自然月生成' },
+  { value: 'custom', label: '指定时间段', desc: '自定义起止日期' }
+]
+const manualReportWeekRange = computed(() => getWeekRange(manualReportForm.value.weekDate))
+const manualReportWeekRangeText = computed(() => {
+  const range = manualReportWeekRange.value
+  return range.length === 2 ? `日期范围：${range[0]} 至 ${range[1]}` : '请选择周'
+})
+const manualReportMonthRange = computed(() => getMonthRange(manualReportForm.value.month))
+const manualReportMonthRangeText = computed(() => {
+  const range = manualReportMonthRange.value
+  return range.length === 2 ? `日期范围：${range[0]} 至 ${range[1]}` : '请选择月份'
+})
+const manualReportPeriodText = computed(() => {
+  const form = manualReportForm.value
+  if (form.type === 'daily') return form.day || '未选择日期'
+  if (form.type === 'weekly') return manualReportWeekRangeText.value.replace('日期范围：', '')
+  if (form.type === 'monthly') return manualReportMonthRangeText.value.replace('日期范围：', '')
+  const range = form.customRange
+  return range?.length === 2 ? `${range[0]} 至 ${range[1]}` : '未选择时间段'
+})
+const getReportPeriodRange = (type, period) => {
+  if (!period) return ['', '']
+  if (period.includes(' 至 ')) return period.split(' 至 ')
+  if (type === 'daily') return [period, period]
+  if (type === 'monthly') return getMonthRange(period)
+  return [period, period]
+}
+const getReportFileName = (type, row) => {
+  const [startDate, endDate] = getReportPeriodRange(type, row?.period)
+  const safeProjectName = currentProjectName.replace(/[\\/:*?"<>|]/g, '')
+  return `${safeProjectName}_${reportTypeText[type]}_${startDate}_${endDate}`
+}
 const monitorQuestions = [
   '湿疹宝宝护肤品牌推荐',
   '婴儿湿疹用什么护肤品好',
@@ -902,20 +1108,23 @@ const futurePlans = ref([
   { id: 'PLAN-0523', name: '每日全量监控', nextTime: '2026-05-23 09:00', questionCount: monitorQuestions.length, models: enabledMonitorModels, cycle: '每天' }
 ])
 
-const reports = {
+const reports = reactive({
   daily: [
-    { period: '2026-05-22', mentionRate: 72.4, avgRank: 2.8, runCount: 1, qualifiedDays: 1, summary: '提及率和平均顺位均达标' },
-    { period: '2026-05-21', mentionRate: 76.2, avgRank: 2.6, runCount: 1, qualifiedDays: 1, summary: '提及率和平均顺位均达标' },
-    { period: '2026-05-20', mentionRate: 68.6, avgRank: 2.9, runCount: 1, qualifiedDays: 0, summary: '提及率未达到 70%' }
+    { type: 'daily', period: '2026-05-22', status: 'done', createdAt: '2026-05-22 10:18', completedAt: '2026-05-22 10:21', mentionRate: 72.4, avgRank: 2.8, runCount: 1, qualifiedDays: 1, summary: '提及率和平均顺位均达标' },
+    { type: 'daily', period: '2026-05-21', status: 'done', createdAt: '2026-05-21 10:16', completedAt: '2026-05-21 10:19', mentionRate: 76.2, avgRank: 2.6, runCount: 1, qualifiedDays: 1, summary: '提及率和平均顺位均达标' },
+    { type: 'daily', period: '2026-05-20', status: 'done', createdAt: '2026-05-20 17:20', completedAt: '2026-05-20 17:23', mentionRate: 68.6, avgRank: 2.9, runCount: 1, qualifiedDays: 0, summary: '提及率未达到 70%' }
   ],
   weekly: [
-    { period: '2026-05-18 至 2026-05-24', mentionRate: 71.8, avgRank: 2.9, runCount: 6, qualifiedDays: 4, summary: '本周已有 4 天达标' }
+    { type: 'weekly', period: '2026-05-18 至 2026-05-24', status: 'done', createdAt: '2026-05-24 18:00', completedAt: '2026-05-24 18:06', mentionRate: 71.8, avgRank: 2.9, runCount: 6, qualifiedDays: 4, summary: '本周已有 4 天达标' }
   ],
   monthly: [
-    { period: '2026-05', mentionRate: 72.1, avgRank: 2.9, runCount: 22, qualifiedDays: 18, summary: '距离月度 22 天目标还差 4 天' },
-    { period: '2026-04', mentionRate: 73.6, avgRank: 2.7, runCount: 30, qualifiedDays: 23, summary: '月度达标天数满足要求' }
+    { type: 'monthly', period: '2026-05', status: 'generating', createdAt: '2026-05-22 18:30', completedAt: '-', mentionRate: 72.1, avgRank: 2.9, runCount: 22, qualifiedDays: 18, summary: '距离月度 22 天目标还差 4 天' },
+    { type: 'monthly', period: '2026-04', status: 'done', createdAt: '2026-04-30 18:00', completedAt: '2026-04-30 18:08', mentionRate: 73.6, avgRank: 2.7, runCount: 30, qualifiedDays: 23, summary: '月度达标天数满足要求' }
+  ],
+  custom: [
+    { type: 'custom', period: '2026-05-10 至 2026-05-22', status: 'failed', createdAt: '2026-05-22 19:10', completedAt: '2026-05-22 19:11', mentionRate: 70.9, avgRank: 3.1, runCount: 13, qualifiedDays: 8, summary: '指定时间段内提及率达标，平均顺位略低于目标' }
   ]
-}
+})
 
 Object.values(reports).flat().forEach(report => {
   report.mentionPassed = report.mentionRate >= targetConfig.value.mentionRate
@@ -925,13 +1134,14 @@ Object.values(reports).flat().forEach(report => {
   if (isAvgRankEnabled.value) enabledResults.push(report.rankPassed)
   report.passed = enabledResults.length ? enabledResults.every(Boolean) : false
 })
-reports.monthly.forEach(report => {
-  if (isMonthlyDaysEnabled.value) {
+Object.values(reports).flat().forEach(report => {
+  if (report.type === 'monthly' && isMonthlyDaysEnabled.value) {
     report.passed = report.passed && report.qualifiedDays >= targetConfig.value.monthlyDays
   }
 })
 
-const currentReports = computed(() => reports[activeReportType.value])
+const allReports = computed(() => Object.values(reports).flat())
+const filteredReports = computed(() => reportTypeFilter.value === 'all' ? allReports.value : allReports.value.filter(report => report.type === reportTypeFilter.value))
 const monthlySummary = computed(() => ({ days: reports.monthly[0].qualifiedDays, passed: reports.monthly[0].qualifiedDays >= targetConfig.value.monthlyDays }))
 const routeTaskId = computed(() => route.params.taskId)
 const isDetailPage = computed(() => Boolean(routeTaskId.value))
@@ -1129,9 +1339,64 @@ const handleExportRetest = (retest, type = 'data') => {
   ElMessage.success(`已创建复测任务 ${retest.id} 的${type === 'screenshot' ? '截图' : '数据'}导出任务，可在导出中心查看进度`)
 }
 
+const openManualReportDialog = () => {
+  manualReportVisible.value = true
+}
+
+const handleCreateManualReport = () => {
+  const form = manualReportForm.value
+  if ((form.type === 'daily' && !form.day) || (form.type === 'monthly' && !form.month)) {
+    ElMessage.warning('请选择统计时间')
+    return
+  }
+  if (form.type === 'weekly' && manualReportWeekRange.value.length !== 2) {
+    ElMessage.warning('请选择统计周')
+    return
+  }
+  if (form.type === 'custom' && form.customRange.length !== 2) {
+    ElMessage.warning('请选择统计时间段')
+    return
+  }
+  const existingReport = reports[form.type].find(report => report.period === manualReportPeriodText.value)
+  if (existingReport) {
+    ElMessage.warning('报告已存在')
+    return
+  }
+  reports[form.type].unshift({
+    type: form.type,
+    period: manualReportPeriodText.value,
+    status: 'generating',
+    createdAt: getDateTimeText(),
+    completedAt: '-',
+    mentionRate: 0,
+    avgRank: '-',
+    runCount: 0,
+    qualifiedDays: '-',
+    mentionPassed: false,
+    rankPassed: false,
+    passed: false,
+    summary: '报告生成中，完成后可查看结论并下载'
+  })
+  reportTypeFilter.value = form.type
+  ElMessage.success(`已创建${reportTypeText[form.type]}生成任务：${manualReportPeriodText.value}`)
+  manualReportVisible.value = false
+}
+
+const handleViewReport = (row) => {
+  if (row.status === 'generating') {
+    ElMessage.info('报告正在生成，完成后可查看详情')
+    return
+  }
+  if (row.status === 'failed') {
+    ElMessage.warning('报告生成失败，请重新创建报告')
+    return
+  }
+  ElMessage.success(`打开${row.period}${reportTypeText[row.type]}详情`)
+}
+
 const handleExportReport = (type, row) => {
-  const reportName = row ? `${row.period}${reportTypeText[type]}` : reportTypeText[type]
-  ElMessage.success(`已创建 ${reportName} 导出任务，可在导出中心查看进度`)
+  const reportName = row ? getReportFileName(type, row) : `${currentProjectName}_${reportTypeText[type]}`
+  ElMessage.success(`${reportName} 下载成功`)
 }
 </script>
 
@@ -1185,7 +1450,31 @@ const handleExportReport = (type, row) => {
 .pass-text { color: #059669; font-weight: 700; }
 .fail-text { color: #dc2626; font-weight: 700; }
 .report-summary { margin-left: 8px; color: #64748b; font-size: 13px; }
-.report-tabs { margin-top: -6px; }
+.manual-report-form { padding-top: 2px; }
+.manual-report-form :deep(.el-form-item) { margin-bottom: 18px; }
+.manual-report-form :deep(.el-form-item__label) { padding-bottom: 8px; color: #111827; font-weight: 800; }
+.manual-report-form :deep(.no-label .el-form-item__label) { display: none; }
+.manual-report-section { padding: 14px; border: 1px solid #eef2f7; border-radius: 8px; background: #fbfdff; }
+.report-type-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; width: 100%; }
+.report-type-card { min-height: 74px; padding: 12px 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; text-align: left; cursor: pointer; transition: border-color .16s ease, box-shadow .16s ease, background .16s ease; }
+.report-type-card strong { display: block; color: #111827; font-size: 14px; font-weight: 800; }
+.report-type-card span { display: block; margin-top: 6px; color: #8a95a6; font-size: 12px; line-height: 1.35; }
+.report-type-card.active { border-color: #2563eb; background: #eff6ff; box-shadow: 0 8px 18px rgba(37, 99, 235, .12); }
+.report-type-card.active strong { color: #2563eb; }
+.manual-time-box { display: flex; align-items: center; min-height: 34px; }
+.time-picker-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.week-range-preview { color: #475569; font-size: 13px; }
+.manual-report-tip { padding: 12px 14px; border-radius: 8px; background: #eff6ff; color: #2563eb; font-size: 13px; line-height: 1.6; }
+.manual-report-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; }
+.report-cost-tip { color: #dc2626; font-size: 13px; font-weight: 700; }
+.manual-report-actions { display: flex; align-items: center; gap: 10px; }
+.manual-report-title-row { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+.manual-report-title-row span { color: #111827; font-size: 18px; font-weight: 800; }
+.manual-report-title-row em { color: #94a3b8; font-size: 12px; font-style: normal; font-weight: 500; }
+:deep(.manual-report-dialog .el-dialog__header) { padding: 18px 22px 8px; }
+:deep(.manual-report-dialog .el-dialog__title) { color: #111827; font-size: 18px; font-weight: 800; }
+:deep(.manual-report-dialog .el-dialog__body) { padding: 12px 22px 8px; }
+:deep(.manual-report-dialog .el-dialog__footer) { padding: 10px 22px 18px; border-top: 1px solid #eef2f7; }
 .detail-title-row.compact { padding-bottom: 12px; border-bottom: 1px solid #eef2f7; margin-bottom: 12px; }
 .detail-panel { max-width: none; margin: 0 auto; }
 .detail-actions-hidden { display: none; }
