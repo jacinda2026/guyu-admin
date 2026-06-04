@@ -114,7 +114,7 @@ const routes = [
       // 3. 閰嶇疆涓績
       { path: 'config/issue', name: 'ConfigIssue', component: () => import('../views/project/QuestionConfig.vue'), meta: { title: '闂閰嶇疆' } },
       { path: 'config/competitor', name: 'ConfigCompetitor', component: () => import('../views/project/CompetitorConfig.vue'), meta: { title: '绔炲搧閰嶇疆' } },
-      { path: 'config/source', name: 'ConfigSource', component: () => import('../views/project/SourceManagement.vue'), meta: { title: '信源管理' } },
+      { path: 'config/source', name: 'ConfigSource', component: () => import('../views/project/SourceManagement.vue'), meta: { title: '我的信源' } },
       { path: 'config/monitor', name: 'ConfigMonitor', component: () => import('../views/project/MonitorConfig.vue'), meta: { title: '鐩戞帶閰嶇疆' } },
       
       // 4. 鏅鸿兘浣?

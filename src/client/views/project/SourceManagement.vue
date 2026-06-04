@@ -1,51 +1,40 @@
+<!-- VERSION: SourceManagement_v20260604_1426 | changes: 修复两个Tab共用时间弹窗visible导致同时弹出 -->
 <template>
   <div class="source-management-page">
     <section class="page-card">
-      <div class="page-header">
-        <div>
-          <div class="page-title">信源管理</div>
-          <div class="page-desc">管理全网采集信源、客户目标信源池和差异运算结果，用于判断品牌信源覆盖、竞品信源、低质信源和缺失信源。</div>
-        </div>
-      </div>
-
-      <div class="filter-card">
-        <div class="filter-row">
-          <div class="segmented">
-            <button :class="{ active: timeRangeType === '7d' }" @click="timeRangeType = '7d'">最近7天</button>
-            <button :class="{ active: timeRangeType === '30d' }" @click="timeRangeType = '30d'">最近30天</button>
-            <button :class="{ active: timeRangeType === 'custom' }" @click="openDateModal">自定义时间段</button>
-          </div>
-          <div class="selected-info">{{ activeRangeLabel }}</div>
-        </div>
-      </div>
-
-      <div class="summary-grid">
-        <div class="summary-card">
-          <span>全网采集信源</span>
-          <strong>{{ rangeCollectedSources.length }}</strong>
-          <p>大模型回答中引用的 URL 级信源</p>
-        </div>
-        <div class="summary-card">
-          <span>命中品牌</span>
-          <strong>{{ brandHitCount }}</strong>
-          <p>标题或摘要中命中本品品牌</p>
-        </div>
-        <div class="summary-card warning">
-          <span>竞品信源</span>
-          <strong>{{ competitorSourceCount }}</strong>
-          <p>疑似正在强化竞品认知</p>
-        </div>
-        <div class="summary-card danger">
-          <span>低质信源</span>
-          <strong>{{ lowQualityCount }}</strong>
-          <p>低权重、内容农场或过时信源</p>
-        </div>
-      </div>
-
       <el-tabs v-model="activeTab" class="source-tabs">
-        <el-tab-pane label="自有信源库" name="target">
+        <el-tab-pane label="我的信源" name="target">
           <div class="table-toolbar">
-            <el-input v-model="keyword" class="search-input" placeholder="搜索文章标题、URL、关联问题或关联模型" :prefix-icon="Search" clearable />
+            <el-popover v-model:visible="targetTimePanelVisible" placement="bottom-start" trigger="click" :width="260" popper-class="source-time-popover" @show="syncPendingDateRange">
+              <template #reference>
+                <button type="button" class="time-trigger">
+                  <el-icon><Calendar /></el-icon>
+                  <span>{{ timeTriggerLabel }}</span>
+                  <span class="trigger-caret">⌄</span>
+                </button>
+              </template>
+              <div class="time-panel">
+                <button type="button" :class="{ active: timeRangeType === '7d' }" @click="setQuickRange('7d')">最近7天</button>
+                <button type="button" :class="{ active: timeRangeType === '30d' }" @click="setQuickRange('30d')">最近30天</button>
+                <div class="time-panel-divider"></div>
+                <div class="date-range-editor">
+                  <span>时间段</span>
+                  <input type="date" v-model="pendingDateRange.startDate" />
+                  <input type="date" v-model="pendingDateRange.endDate" />
+                </div>
+                <div class="time-panel-footer">
+                  <span>{{ activeRangeLabel }}</span>
+                  <button type="button" @click="confirmDateRange">确定</button>
+                </div>
+              </div>
+            </el-popover>
+            <el-select v-model="modelFilter" class="model-filter" placeholder="所有模型" multiple collapse-tags collapse-tags-tooltip clearable>
+              <el-option v-for="model in modelOptions" :key="model" :label="model" :value="model" />
+            </el-select>
+            <el-select v-model="questionFilter" class="question-filter" placeholder="全部问题" multiple collapse-tags collapse-tags-tooltip clearable>
+              <el-option v-for="question in allQuestionOptions" :key="question" :label="question" :value="question" />
+            </el-select>
+            <el-input v-model="keyword" class="search-input" placeholder="搜索域名、URL、文章标题、摘要" :prefix-icon="Search" clearable />
             <el-select v-model="statusFilter" class="status-filter" placeholder="当前状态" clearable>
               <el-option label="已收录" value="已收录" />
               <el-option label="未收录" value="未收录" />
@@ -53,9 +42,7 @@
               <el-option label="已失效" value="已失效" />
             </el-select>
             <div class="toolbar-spacer"></div>
-            <el-button @click="downloadTemplate">下载模板</el-button>
-            <el-button type="primary" @click="importDialogVisible = true">导入信源</el-button>
-            <el-button type="primary" plain @click="openSourceDialog()">+ 添加信源</el-button>
+            <el-button type="primary" @click="importDialogVisible = true">添加信源</el-button>
             <el-button @click="checkInvalidLinks">失效链接检测</el-button>
           </div>
 
@@ -114,16 +101,53 @@
 
         <el-tab-pane label="全网采集信源" name="collected">
           <div class="table-toolbar">
-            <el-input v-model="collectedKeyword" class="search-input" placeholder="搜索域名、URL、文章标题、摘要、模型或问题" :prefix-icon="Search" clearable />
-            <el-select v-model="sentimentFilter" class="status-filter" placeholder="情感" clearable>
-              <el-option label="负面" value="负面" />
-              <el-option label="中性" value="中性" />
-              <el-option label="正面" value="正面" />
+            <el-popover v-model:visible="collectedTimePanelVisible" placement="bottom-start" trigger="click" :width="260" popper-class="source-time-popover" @show="syncPendingDateRange">
+              <template #reference>
+                <button type="button" class="time-trigger">
+                  <el-icon><Calendar /></el-icon>
+                  <span>{{ timeTriggerLabel }}</span>
+                  <span class="trigger-caret">⌄</span>
+                </button>
+              </template>
+              <div class="time-panel">
+                <button type="button" :class="{ active: timeRangeType === '7d' }" @click="setQuickRange('7d')">最近7天</button>
+                <button type="button" :class="{ active: timeRangeType === '30d' }" @click="setQuickRange('30d')">最近30天</button>
+                <div class="time-panel-divider"></div>
+                <div class="date-range-editor">
+                  <span>时间段</span>
+                  <input type="date" v-model="pendingDateRange.startDate" />
+                  <input type="date" v-model="pendingDateRange.endDate" />
+                </div>
+                <div class="time-panel-footer">
+                  <span>{{ activeRangeLabel }}</span>
+                  <button type="button" @click="confirmDateRange">确定</button>
+                </div>
+              </div>
+            </el-popover>
+            <el-select v-model="modelFilter" class="model-filter" placeholder="所有模型" multiple collapse-tags collapse-tags-tooltip clearable>
+              <el-option v-for="model in modelOptions" :key="model" :label="model" :value="model" />
             </el-select>
+            <el-select v-model="questionFilter" class="question-filter" placeholder="全部问题" multiple collapse-tags collapse-tags-tooltip clearable>
+              <el-option v-for="question in allQuestionOptions" :key="question" :label="question" :value="question" />
+            </el-select>
+            <el-input v-model="collectedKeyword" class="search-input" placeholder="搜索域名、URL、文章标题、摘要" :prefix-icon="Search" clearable />
             <el-select v-model="categoryFilter" class="status-filter" placeholder="所属品牌" clearable>
               <el-option label="本品" value="本品" />
               <el-option label="竞品" value="竞品" />
               <el-option label="行业通用" value="行业通用" />
+            </el-select>
+            <el-select v-model="ownershipFilter" class="status-filter" placeholder="归属状态" clearable>
+              <el-option label="我的信源" value="我的信源" />
+              <el-option label="待布局信源" value="待布局信源" />
+              <el-option label="竞品信源" value="竞品信源" />
+            </el-select>
+            <el-select v-model="riskTypeFilter" class="status-filter" placeholder="风险标识" clearable>
+              <el-option label="正常" value="正常" />
+              <el-option label="负面信源" value="负面信源" />
+              <el-option label="竞品信源" value="竞品信源" />
+              <el-option label="低质信源" value="低质信源" />
+              <el-option label="投诉信源" value="投诉信源" />
+              <el-option label="过期信源" value="过期信源" />
             </el-select>
             <div class="toolbar-spacer"></div>
           </div>
@@ -159,26 +183,31 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column prop="sentiment" label="情感" width="86" align="center">
-              <template #default="{ row }">
-                <el-tag :type="sentimentTagType(row.sentiment)" effect="plain">{{ row.sentiment }}</el-tag>
-              </template>
-            </el-table-column>
             <el-table-column prop="category" label="所属品牌" width="100" align="center">
               <template #default="{ row }">
                 <el-tag effect="plain">{{ row.category }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="rangeCount" label="引用次数" width="92" align="center" />
-            <el-table-column label="判断标记" min-width="190">
+            <el-table-column label="归属状态" width="116" align="center">
+              <template #default="{ row }">
+                <el-tag :type="ownershipTagType(row.ownershipStatus)" effect="plain">{{ row.ownershipStatus }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="风险标识" min-width="170">
               <template #default="{ row }">
                 <div class="tag-list">
-                  <el-tag v-if="row.brandHit" type="success" size="small" effect="plain">命中品牌</el-tag>
-                  <el-tag v-if="row.competitorSource" type="warning" size="small" effect="plain">竞品信源</el-tag>
-                  <el-tag v-if="row.lowQuality" type="danger" size="small" effect="plain">低质信源</el-tag>
+                  <el-tag
+                    v-for="tag in row.riskTags"
+                    :key="tag"
+                    size="small"
+                    :type="riskTagType(tag)"
+                    effect="plain"
+                  >{{ tag }}</el-tag>
+                  <el-tag v-if="!row.riskTags.length" size="small" type="success" effect="plain">正常</el-tag>
                 </div>
               </template>
             </el-table-column>
+            <el-table-column prop="rangeCount" label="引用次数" width="92" align="center" />
             <el-table-column prop="publishTime" label="发布时间" width="120" />
             <el-table-column prop="summary" label="摘要" min-width="260" show-overflow-tooltip />
             </el-table>
@@ -195,141 +224,32 @@
             />
           </div>
         </el-tab-pane>
+
+
       </el-tabs>
     </section>
 
-    <div class="date-modal-mask" :class="{ show: dateModalVisible }" @click.self="closeDateModal">
-      <div class="date-modal">
-        <div class="date-modal-header">
-          <h3>选择自定义时间段</h3>
-          <button class="date-modal-close" type="button" @click="closeDateModal">×</button>
-        </div>
-        <div class="date-modal-body">
-          <div class="date-modal-row">
-            <label>时间段</label>
-            <input type="date" v-model="pendingDateRange.startDate" />
-            <span>至</span>
-            <input type="date" v-model="pendingDateRange.endDate" />
-          </div>
-        </div>
-        <div class="date-modal-footer">
-          <button class="ghost-btn" type="button" @click="closeDateModal">取消</button>
-          <button class="primary-btn" type="button" @click="confirmDateModal">确定</button>
-        </div>
-      </div>
-    </div>
 
-    <el-dialog v-model="sourceDialogVisible" title="添加信源" width="720px">
-      <el-form label-position="top">
-        <el-form-item label="文章标题">
-          <el-input v-model="sourceForm.name" placeholder="例如：品牌官网介绍、官方旗舰店商品页、知乎专栏文章、小红书账号主页" />
-        </el-form-item>
-        <el-form-item label="信源 URL / 域名">
-          <el-input v-model="sourceForm.match" placeholder="支持完整 URL，也支持域名级别，例如 https://example.com/news 或 example.com" @blur="sourceForm.domain = parseDomain(sourceForm.match)" />
-        </el-form-item>
-        <el-row :gutter="12">
-          <el-col :span="12">
-            <el-form-item label="平台">
-              <el-input v-model="sourceForm.platform" placeholder="例如：官网、京东、知乎、小红书" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="域名">
-              <el-input v-model="sourceForm.domain" placeholder="系统会根据 URL 自动解析" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="12">
-          <el-col :span="12">
-            <el-form-item label="发布时间">
-              <el-date-picker v-model="sourceForm.publishTime" type="date" value-format="YYYY-MM-DD" placeholder="选择发布时间" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="信源类型">
-              <el-select v-model="sourceForm.type" style="width: 100%">
-                <el-option label="官网" value="官网" />
-                <el-option label="百科" value="百科" />
-                <el-option label="新闻稿" value="新闻稿" />
-                <el-option label="社媒账号" value="社媒账号" />
-                <el-option label="垂直媒体" value="垂直媒体" />
-                <el-option label="电商页" value="电商页" />
-                <el-option label="测评页" value="测评页" />
-                <el-option label="白皮书" value="白皮书" />
-                <el-option label="视频号" value="视频号" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="所属品牌">
-              <el-select v-model="sourceForm.category" style="width: 100%">
-                <el-option label="本品" value="本品" />
-                <el-option label="竞品" value="竞品" />
-                <el-option label="行业通用" value="行业通用" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="12">
-          <el-col :span="12">
-            <el-form-item label="当前状态">
-              <el-select v-model="sourceForm.status" style="width: 100%">
-                <el-option label="已收录" value="已收录" />
-                <el-option label="未收录" value="未收录" />
-                <el-option label="待优化" value="待优化" />
-                <el-option label="已失效" value="已失效" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="权威等级">
-              <el-radio-group v-model="sourceForm.weight">
-                <el-radio-button label="A级" />
-                <el-radio-button label="B级" />
-                <el-radio-button label="C级" />
-              </el-radio-group>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="12">
-          <el-col :span="12">
-            <el-form-item label="关联问题">
-              <el-select v-model="sourceForm.relatedQuestions" multiple filterable allow-create default-first-option placeholder="这篇文章被哪些问题的答案引用" style="width: 100%">
-                <el-option v-for="item in questionOptions" :key="item" :label="item" :value="item" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="关联模型">
-              <el-select v-model="sourceForm.relatedModels" multiple placeholder="这篇文章被哪些大模型引用" style="width: 100%">
-                <el-option v-for="model in modelOptions" :key="model" :label="model" :value="model" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-form>
-      <template #footer>
-        <el-button @click="sourceDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmSource">保存</el-button>
-      </template>
-    </el-dialog>
 
-    <el-dialog v-model="importDialogVisible" title="导入信源列表" width="620px">
+    <el-dialog v-model="importDialogVisible" title="添加信源列表" width="620px">
       <div class="import-box">
-        <el-upload drag action="#" :auto-upload="false" accept=".xlsx,.xls,.csv">
-          <el-icon class="upload-icon"><UploadFilled /></el-icon>
-          <div class="upload-title">将 Excel / CSV 文件拖到此处，或点击上传</div>
-          <div class="upload-desc">字段建议：文章标题、URL/域名、平台、信源类型、所属品牌、权威等级、关联问题、关联模型、当前状态</div>
-        </el-upload>
+        <div class="upload-panel">
+          <el-button class="template-btn" size="small" plain @click="downloadTemplate">下载模板</el-button>
+          <el-upload drag action="#" :auto-upload="false" accept=".xlsx,.xls,.csv">
+            <el-icon class="upload-icon"><UploadFilled /></el-icon>
+            <div class="upload-title">将 Excel / CSV 文件拖到此处，或点击上传</div>
+            <div class="upload-desc">字段建议：文章标题、URL/域名、平台、信源类型、所属品牌、权威等级、关联问题、关联模型、当前状态</div>
+          </el-upload>
+        </div>
         <el-input
           v-model="batchText"
           type="textarea"
           :rows="6"
           class="batch-input"
-          placeholder="也可以直接粘贴信源，每行一个。示例：
-卓牧羊奶粉品牌官网介绍, zhuomu.example.com, 官网, 官网, 本品, A级, 卓牧羊奶粉安全吗？;卓牧羊奶粉口碑怎么样？, 豆包;DeepSeek;Kimi, 未收录
-卓牧羊奶粉官方旗舰店商品页, https://mall.example.com/zhuomu, 官方旗舰店, 电商页, 本品, A级, 卓牧羊奶粉真实评价怎么样？, 豆包;元宝, 已收录
-知乎专栏：中老年羊奶粉怎么选, https://zhuanlan.zhihu.com/zhuomu, 知乎, 社媒账号, 本品, B级, 羊奶粉哪个牌子更适合长期喝？, 通义千问;文心一言, 待优化"
+          placeholder="可以直接粘贴信源，每行一个。示例：
+https://mall.example.com/zhuomu
+https://mall.example.com/title1
+https://mall.example.com/title2"
         />
       </div>
       <template #footer>
@@ -344,14 +264,18 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, UploadFilled } from '@element-plus/icons-vue'
+import { Calendar, Search, UploadFilled } from '@element-plus/icons-vue'
 
 const keyword = ref('')
 const collectedKeyword = ref('')
+const sourceEffectTab = ref('unusedSources')
 const activeTab = ref('target')
 const statusFilter = ref('')
 const categoryFilter = ref('')
-const sentimentFilter = ref('')
+const ownershipFilter = ref('')
+const riskTypeFilter = ref('')
+const modelFilter = ref([])
+const questionFilter = ref([])
 const collectedPage = ref(1)
 const collectedPageSize = ref(20)
 const sourceDialogVisible = ref(false)
@@ -360,17 +284,12 @@ const editingSourceId = ref(null)
 const batchText = ref('')
 const timeRangeType = ref('7d')
 const customDateRange = ref([])
-const dateModalVisible = ref(false)
+const targetTimePanelVisible = ref(false)
+const collectedTimePanelVisible = ref(false)
 const pendingDateRange = reactive({
   startDate: '2026-05-23',
   endDate: '2026-05-29'
 })
-
-const timeRangeOptions = [
-  { label: '最近7天', value: '7d' },
-  { label: '最近30天', value: '30d' },
-  { label: '自定义时间段', value: 'custom' }
-]
 
 const modelOptions = ['豆包', '元宝', '通义千问', 'Kimi', 'DeepSeek', '文心一言']
 const questionOptions = [
@@ -487,17 +406,29 @@ const rangeEndDate = computed(() => {
 
 const activeRangeLabel = computed(() => `${rangeStartDate.value} 至 ${rangeEndDate.value}`)
 
-const openDateModal = () => {
+const formatMonthDay = (value) => {
+  const [, month, day] = String(value).split('-')
+  return `${Number(month)}/${Number(day)}`
+}
+
+const timeTriggerLabel = computed(() => {
+  if (timeRangeType.value === '7d') return '最近7天'
+  if (timeRangeType.value === '30d') return '最近30天'
+  return `${formatMonthDay(rangeStartDate.value)} - ${formatMonthDay(rangeEndDate.value)}`
+})
+
+const syncPendingDateRange = () => {
   pendingDateRange.startDate = customDateRange.value?.[0] || rangeStartDate.value
   pendingDateRange.endDate = customDateRange.value?.[1] || rangeEndDate.value
-  dateModalVisible.value = true
 }
 
-const closeDateModal = () => {
-  dateModalVisible.value = false
+const setQuickRange = (type) => {
+  timeRangeType.value = type
+  targetTimePanelVisible.value = false
+  collectedTimePanelVisible.value = false
 }
 
-const confirmDateModal = () => {
+const confirmDateRange = () => {
   if (!pendingDateRange.startDate || !pendingDateRange.endDate) {
     ElMessage.warning('请选择完整的时间段')
     return
@@ -508,7 +439,8 @@ const confirmDateModal = () => {
   }
   customDateRange.value = [pendingDateRange.startDate, pendingDateRange.endDate]
   timeRangeType.value = 'custom'
-  closeDateModal()
+  targetTimePanelVisible.value = false
+  collectedTimePanelVisible.value = false
 }
 
 const isInActiveRange = (date) => {
@@ -528,9 +460,51 @@ const rangeSources = computed(() => sourceList.value.map(item => ({
   status: sourceRangeCount(item) > 0 ? '已收录' : item.status
 })))
 
+function isCollectedMatchedWithOwnSource(item) {
+  return sourceList.value.some(source => isSameSource(source, item))
+}
+
+function isComplaintSource(item) {
+  const text = `${item.domain || ''}${item.url || ''}${item.title || ''}${item.summary || ''}`.toLowerCase()
+  return /黑猫|投诉|消费保|complaint|315|heimao/.test(text)
+}
+
+function isExpiredSource(item) {
+  if (!item.publishTime) return false
+  const date = new Date(item.publishTime)
+  if (Number.isNaN(date.getTime())) return false
+  const diffDays = Math.floor((new Date('2026-06-04').getTime() - date.getTime()) / (24 * 60 * 60 * 1000))
+  return diffDays > 365
+}
+
+function getCollectedRiskTags(item) {
+  return [
+    item.sentiment === '负面' ? '负面信源' : '',
+    item.competitorSource || item.category === '竞品' ? '竞品信源' : '',
+    item.lowQuality ? '低质信源' : '',
+    isComplaintSource(item) ? '投诉信源' : '',
+    isExpiredSource(item) ? '过期信源' : ''
+  ].filter(Boolean)
+}
+
+function getCollectedOwnershipStatus(item) {
+  if (isCollectedMatchedWithOwnSource(item)) return '我的信源'
+  if (item.competitorSource || item.category === '竞品') return '竞品信源'
+  return '待布局信源'
+}
+
 const rangeCollectedSources = computed(() => collectedSourceList.value
   .filter(item => isInActiveRange(item.publishTime))
-  .map(item => ({ ...item, rangeCount: item.count }))
+  .map(item => {
+    const riskTags = getCollectedRiskTags(item)
+    return {
+      ...item,
+      rangeCount: item.count,
+      ownershipStatus: getCollectedOwnershipStatus(item),
+      riskTags,
+      riskStatus: riskTags.length ? '风险信源' : '正常'
+    }
+  })
 )
 
 const filteredSources = computed(() => {
@@ -538,7 +512,9 @@ const filteredSources = computed(() => {
   return rangeSources.value.filter(item => {
     const matchKeyword = !key || `${item.name}${item.platform}${item.type}${item.category}${item.match}${item.domain}${(item.relatedQuestions || []).join('')}${(item.relatedModels || []).join('')}${item.status}`.toLowerCase().includes(key)
     const matchStatus = !statusFilter.value || item.status === statusFilter.value
-    return matchKeyword && matchStatus
+    const matchModel = !modelFilter.value.length || modelFilter.value.some(model => (item.relatedModels || []).includes(model))
+    const matchQuestion = !questionFilter.value.length || questionFilter.value.some(question => (item.relatedQuestions || []).includes(question))
+    return matchKeyword && matchStatus && matchModel && matchQuestion
   })
 })
 
@@ -546,11 +522,217 @@ const filteredCollectedSources = computed(() => {
   const key = collectedKeyword.value.trim().toLowerCase()
   return rangeCollectedSources.value.filter(item => {
     const matchKeyword = !key || `${item.domain}${item.url}${item.platform}${item.title}${item.summary}${item.models.join('')}${item.questions.join('')}`.toLowerCase().includes(key)
-    const matchSentiment = !sentimentFilter.value || item.sentiment === sentimentFilter.value
     const matchCategory = !categoryFilter.value || item.category === categoryFilter.value
-    return matchKeyword && matchSentiment && matchCategory
+    const matchOwnership = !ownershipFilter.value || item.ownershipStatus === ownershipFilter.value
+    const matchRisk = !riskTypeFilter.value || (riskTypeFilter.value === '正常' ? !item.riskTags.length : item.riskTags.includes(riskTypeFilter.value))
+    const matchModel = !modelFilter.value.length || modelFilter.value.some(model => (item.models || []).includes(model))
+    const matchQuestion = !questionFilter.value.length || questionFilter.value.some(question => (item.questions || []).includes(question))
+    return matchKeyword && matchCategory && matchOwnership && matchRisk && matchModel && matchQuestion
   })
 })
+
+
+const normalizeDomain = (value = '') => parseDomain(value).toLowerCase().replace(/^m\./, '').replace(/^www\./, '')
+
+const rootDomain = (value = '') => {
+  const domain = normalizeDomain(value)
+  if (!domain || domain === '未提供') return domain
+  const platformDomains = ['zhihu.com', 'xiaohongshu.com', 'jd.com', 'baidu.com', 'weibo.com', 'bilibili.com', 'douyin.com', 'toutiao.com']
+  const matched = platformDomains.find(item => domain === item || domain.endsWith(`.${item}`))
+  if (matched) return matched
+  const parts = domain.split('.').filter(Boolean)
+  return parts.length >= 2 ? parts.slice(-2).join('.') : domain
+}
+
+
+const compareBaseCollectedSources = computed(() => {
+  return rangeCollectedSources.value.filter(item => {
+    const matchModel = !modelFilter.value.length || modelFilter.value.some(model => (item.models || []).includes(model))
+    return matchModel
+  })
+})
+
+const getMatchDetail = (source, collected) => {
+  const sourceRaw = source.match || source.url || source.domain || ''
+  const collectedRaw = collected.url || collected.domain || ''
+  const sourceUrl = /^https?:\/\//i.test(sourceRaw) ? sourceRaw.toLowerCase() : `https://${sourceRaw}`.toLowerCase()
+  const collectedUrl = /^https?:\/\//i.test(collectedRaw) ? collectedRaw.toLowerCase() : `https://${collectedRaw}`.toLowerCase()
+  const sourceDomain = normalizeDomain(source.domain || sourceRaw)
+  const collectedDomain = normalizeDomain(collected.domain || collectedRaw)
+  const sourceRoot = rootDomain(source.domain || sourceRaw)
+  const collectedRoot = rootDomain(collected.domain || collectedRaw)
+
+  if (sourceRaw && collectedRaw && sourceUrl === collectedUrl) {
+    return { matched: true, type: 'URL精确' }
+  }
+  if (sourceDomain && collectedDomain && sourceDomain === collectedDomain) {
+    return { matched: true, type: '域名匹配' }
+  }
+  if (sourceRoot && collectedRoot && sourceRoot === collectedRoot) {
+    return { matched: true, type: '根域名匹配' }
+  }
+  return { matched: false, type: '未匹配' }
+}
+
+const isSameSource = (source, collected) => getMatchDetail(source, collected).matched
+
+const daysBetween = (date, endDate = rangeEndDate.value) => {
+  if (!date) return '-'
+  const start = new Date(date)
+  const end = new Date(endDate)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return '-'
+  const diff = Math.ceil((end - start) / (24 * 60 * 60 * 1000))
+  return diff > 0 ? diff : 0
+}
+
+const sourceEffectSuggestion = (source) => {
+  const type = source.type || ''
+  if (type.includes('官网')) return '补充 FAQ、产品参数、适用场景、品牌背书和竞品对比内容，并提升页面可抓取性。'
+  if (type.includes('新闻')) return '将新闻稿二次分发到权威媒体、行业垂媒、百家号、搜狐号等外部平台。'
+  if (type.includes('知乎')) return '改成问题型标题，补充真实场景、对比信息和品牌差异化答案。'
+  if (type.includes('小红书') || type.includes('社媒')) return '增加体验、测评、避坑、对比类内容，并围绕监控问题设置标题和正文关键词。'
+  if (type.includes('电商')) return '补充商品问答、买家评价、参数一致性和售后说明，提升平台内可见度。'
+  if (type.includes('白皮书')) return '将白皮书拆成多篇可搜索文章，并分发到第三方媒体、知乎和行业平台。'
+  return '围绕目标问题补充结构化内容、外部分发和引用链路建设。'
+}
+
+const questionEffectSuggestion = (question) => {
+  if (/评价|口碑|真实/i.test(question)) return '建议发布口碑、真实评价、用户反馈、测评体验类内容，并优先布局知乎、小红书和电商问答。'
+  if (/哪个|推荐|排行|排名|品牌/i.test(question)) return '建议发布榜单、选购指南、横向对比和第三方测评内容，争取进入推荐类答案信源。'
+  if (/安全|功效|效果|成分|适合/i.test(question)) return '建议发布成分原理、检测报告、专家背书、适用人群和注意事项内容。'
+  if (/价格|怎么买|渠道|旗舰店/i.test(question)) return '建议补充官方价格、购买渠道、旗舰店和售后保障说明。'
+  if (/对比|竞品|哪个好/i.test(question)) return '建议建设本品 vs 竞品差异化内容，突出核心优势和权威证据。'
+  return '建议围绕该问题新增专题文章、FAQ 页面、第三方媒体稿和社媒内容投放。'
+}
+
+const allQuestionOptions = computed(() => {
+  const set = new Set(questionOptions)
+  rangeCollectedSources.value.forEach(item => (item.questions || []).forEach(question => set.add(question)))
+  rangeSources.value.forEach(item => (item.relatedQuestions || []).forEach(question => set.add(question)))
+  return Array.from(set).filter(Boolean)
+})
+
+const activeQuestionOptions = computed(() => {
+  return questionFilter.value.length ? questionFilter.value : allQuestionOptions.value
+})
+
+const effectRangeSources = computed(() => rangeSources.value)
+
+const ownSourceEffectRows = computed(() => {
+  return effectRangeSources.value.map(source => {
+    const hits = compareBaseCollectedSources.value.filter(collected => isSameSource(source, collected))
+    const hitCount = hits.reduce((sum, item) => sum + Number(item.rangeCount || 0), 0)
+    const hitModels = Array.from(new Set(hits.flatMap(item => item.models || [])))
+    const hitQuestions = Array.from(new Set(hits.flatMap(item => item.questions || [])))
+    const strongestMatch = hits.map(item => getMatchDetail(source, item).type).find(type => type === 'URL精确') || hits.map(item => getMatchDetail(source, item).type).find(type => type === '域名匹配') || (hits.length ? '根域名匹配' : '未匹配')
+
+    return {
+      ...source,
+      hitCount,
+      hitModels,
+      hitQuestions,
+      strongestMatch,
+      effectStatus: hitCount > 0 ? '已被引用' : '未被引用',
+      unquotedDays: hitCount > 0 ? 0 : daysBetween(source.publishTime),
+      reason: hitCount > 0 ? '已进入 AI 答案引用链路' : (source.weight === 'A级' ? '重点信源未被引用，疑似收录或分发不足' : '内容未进入当前监测问题的引用链路'),
+      suggestion: hitCount > 0 ? '持续观察引用次数、模型覆盖和情感变化。' : sourceEffectSuggestion(source)
+    }
+  })
+})
+
+const unusedOwnSources = computed(() => ownSourceEffectRows.value.filter(item => item.hitCount === 0))
+const usedOwnSources = computed(() => ownSourceEffectRows.value.filter(item => item.hitCount > 0))
+
+const questionSourceCoverage = computed(() => {
+  return activeQuestionOptions.value.map(question => {
+    const questionSources = compareBaseCollectedSources.value.filter(source => (source.questions || []).includes(question))
+    const ownHits = questionSources.filter(collected => rangeSources.value.some(own => isSameSource(own, collected)))
+    const models = Array.from(new Set(questionSources.flatMap(item => item.models || [])))
+    const ownModels = Array.from(new Set(ownHits.flatMap(item => item.models || [])))
+    const externalDomains = Array.from(new Set(questionSources.map(item => item.domain || parseDomain(item.url)).filter(Boolean)))
+    const totalSourceQuoteCount = questionSources.reduce((sum, item) => sum + Number(item.rangeCount || 0), 0)
+    const ownSourceQuoteCount = ownHits.reduce((sum, item) => sum + Number(item.rangeCount || 0), 0)
+
+    return {
+      question,
+      totalSourceCount: questionSources.length,
+      totalSourceQuoteCount,
+      ownSourceCount: ownHits.length,
+      ownSourceQuoteCount,
+      models,
+      ownModels,
+      externalDomains,
+      status: ownHits.length > 0 ? '有我的信源' : '无我的信源',
+      suggestion: ownHits.length > 0 ? '该问题已有我的信源参与，可继续提升引用次数和模型覆盖。' : questionEffectSuggestion(question)
+    }
+  })
+})
+
+const noOwnSourceQuestions = computed(() => {
+  return questionSourceCoverage.value.filter(item => item.ownSourceCount === 0)
+})
+
+const ownSourceQuestionCoverageRate = computed(() => {
+  const total = questionSourceCoverage.value.length
+  if (!total) return 0
+  const covered = questionSourceCoverage.value.filter(item => item.ownSourceCount > 0).length
+  return Math.round((covered / total) * 100)
+})
+
+const sourceEffectSummary = computed(() => {
+  const messages = []
+  if (unusedOwnSources.value.length > 0) {
+    messages.push(`当前有 ${unusedOwnSources.value.length} 条我的信源未被任何大模型回答引用，说明这些内容尚未进入 AI 答案引用链路，建议优先优化 A级信源和重点问题相关内容。`)
+  } else {
+    messages.push('当前我的信源均已被至少一个大模型回答引用，信源建设效果较好。')
+  }
+  if (noOwnSourceQuestions.value.length > 0) {
+    messages.push(`当前有 ${noOwnSourceQuestions.value.length} 个监控问题没有引用任何我的信源，说明这些问题下我的内容参与度不足，建议围绕这些问题加强文章投放和外部平台分发。`)
+  } else {
+    messages.push('当前所有监控问题均已引用我的信源，问题维度覆盖较完整。')
+  }
+  messages.push(`当前我的信源问题覆盖率为 ${ownSourceQuestionCoverageRate.value}%。`)
+  return messages
+})
+
+const compareStats = computed(() => {
+  const collectedTotalCount = compareBaseCollectedSources.value.reduce((sum, item) => sum + Number(item.rangeCount || 0), 0)
+  const ownedCount = usedOwnSources.value.reduce((sum, item) => sum + Number(item.hitCount || 0), 0)
+  return {
+    targetTotal: effectRangeSources.value.length,
+    usedOwnSourceCount: usedOwnSources.value.length,
+    unusedOwnSourceCount: unusedOwnSources.value.length,
+    noOwnSourceQuestionCount: noOwnSourceQuestions.value.length,
+    questionCoverageRate: ownSourceQuestionCoverageRate.value,
+    ownedQuoteCount: ownedCount,
+    allQuoteCount: collectedTotalCount,
+    ownedQuoteText: `${ownedCount}/${collectedTotalCount}`,
+    ownedQuoteRate: collectedTotalCount ? Math.round((ownedCount / collectedTotalCount) * 100) : 0,
+    coverageRate: effectRangeSources.value.length ? Math.round((usedOwnSources.value.length / effectRangeSources.value.length) * 100) : 0
+  }
+})
+
+const compareConclusions = computed(() => {
+  const stats = compareStats.value
+  const result = []
+  result.push(`当前我的信源共 ${stats.targetTotal} 条，已被引用 ${stats.usedOwnSourceCount} 条，未被引用 ${stats.unusedOwnSourceCount} 条，自有引用/全网引用为 ${stats.ownedQuoteText}。`)
+  result.push(...sourceEffectSummary.value)
+  if (!stats.unusedOwnSourceCount && !stats.noOwnSourceQuestionCount) result.push('当前我的信源引用效果较健康，可继续观察模型覆盖和引用次数变化。')
+  return Array.from(new Set(result))
+})
+
+const ownershipTagType = (status) => {
+  if (status === '我的信源') return 'success'
+  if (status === '待布局信源') return 'primary'
+  if (status === '竞品信源') return 'warning'
+  return 'info'
+}
+
+const riskTagType = (tag) => {
+  if (tag === '负面信源' || tag === '低质信源' || tag === '投诉信源') return 'danger'
+  if (tag === '竞品信源' || tag === '过期信源') return 'warning'
+  return 'info'
+}
 
 const pagedCollectedSources = computed(() => {
   const start = (collectedPage.value - 1) * collectedPageSize.value
@@ -558,10 +740,6 @@ const pagedCollectedSources = computed(() => {
 })
 
 const collectedRowIndex = (index) => (collectedPage.value - 1) * collectedPageSize.value + index + 1
-
-const brandHitCount = computed(() => rangeCollectedSources.value.filter(item => item.brandHit).length)
-const competitorSourceCount = computed(() => rangeCollectedSources.value.filter(item => item.competitorSource).length)
-const lowQualityCount = computed(() => rangeCollectedSources.value.filter(item => item.lowQuality).length)
 
 const headerCellStyle = { background: '#f8fafc', color: '#334155', fontWeight: 800 }
 
@@ -650,6 +828,23 @@ const openSourceDialog = (row) => {
   sourceDialogVisible.value = true
 }
 
+const oneClickOptimizeQuestion = (row) => {
+  resetSourceForm()
+  sourceForm.name = `${row.question} - 待投放优化文章`
+  sourceForm.match = ''
+  sourceForm.domain = ''
+  sourceForm.platform = '待定平台'
+  sourceForm.publishTime = rangeEndDate.value
+  sourceForm.type = '新闻稿'
+  sourceForm.category = '本品'
+  sourceForm.weight = 'A级'
+  sourceForm.relatedQuestions = [row.question]
+  sourceForm.relatedModels = [...(row.models || [])]
+  sourceForm.status = '待优化'
+  sourceDialogVisible.value = true
+  ElMessage.success('已生成优化信源草稿，请补充文章标题和URL后保存')
+}
+
 const confirmSource = () => {
   if (!sourceForm.name.trim() || !sourceForm.match.trim()) {
     ElMessage.warning('请填写文章标题和信源 URL / 域名')
@@ -691,7 +886,7 @@ const confirmSource = () => {
 
 const removeSource = async (row) => {
   const confirmed = await ElMessageBox.confirm(
-    `删除后，「${row.name}」将从自有信源库中移除，后续可通过导入或添加重新维护。`,
+    `删除后，「${row.name}」将从我的信源库中移除，后续可通过导入或添加重新维护。`,
     '删除信源',
     {
       type: 'warning',
@@ -791,34 +986,21 @@ const dedupeCollectedSources = () => {
 .page-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 22px 24px; }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
 .page-title { color: #111827; font-size: 22px; font-weight: 800; line-height: 1.2; }
-.page-desc { margin-top: 8px; color: #64748b; font-size: 13px; }
 .header-actions { display: flex; gap: 10px; flex-shrink: 0; }
-.filter-card { padding: 16px; margin-bottom: 20px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
-.filter-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
-.segmented { display: inline-flex; padding: 4px; gap: 4px; border-radius: 12px; background: #eef2ff; border: 1px solid #dbe4ff; }
-.segmented button { border: 0; background: transparent; color: #4b5563; cursor: pointer; border-radius: 9px; padding: 9px 14px; font-weight: 600; font-size: 13px; transition: all 0.2s; }
-.segmented button.active { background: #245bff; color: #fff; box-shadow: 0 4px 10px rgba(36,91,255,.22); }
-.selected-info { margin-left: auto; color: #245bff; background: #f0f5ff; border: 1px solid #dbeafe; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 800; }
-.date-modal-mask { display: none; position: fixed; inset: 0; z-index: 50; background: rgba(15, 23, 42, 0.34); align-items: center; justify-content: center; padding: 24px; }
-.date-modal-mask.show { display: flex; }
-.date-modal { width: min(640px, 100%); background: #fff; border-radius: 16px; border: 1px solid #e5e7eb; box-shadow: 0 24px 70px rgba(15, 23, 42, .26); overflow: hidden; }
-.date-modal-header { padding: 16px 20px; border-bottom: 1px solid #eef2f7; display: flex; align-items: center; justify-content: space-between; }
-.date-modal-header h3 { margin: 0; font-size: 16px; font-weight: 800; color: #111827; }
-.date-modal-close { width: 30px; height: 30px; border: 0; border-radius: 8px; background: #f3f4f6; cursor: pointer; font-size: 18px; line-height: 1; }
-.date-modal-body { padding: 20px; }
-.date-modal-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.date-modal-row input[type="date"] { height: 38px; border: 1px solid #d1d5db; border-radius: 8px; padding: 0 10px; font-family: inherit; color: #111827; }
-.date-modal-row label { font-size: 13px; font-weight: 800; color: #374151; }
-.date-modal-footer { padding: 14px 20px; background: #f9fafb; border-top: 1px solid #eef2f7; display: flex; justify-content: flex-end; gap: 10px; }
-.ghost-btn { height: 36px; padding: 0 18px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #374151; font-weight: 700; cursor: pointer; }
-.primary-btn { height: 36px; padding: 0 20px; border: 0; border-radius: 8px; background: #245bff; color: #fff; font-weight: 800; cursor: pointer; }
-.summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
-.summary-card { padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f8fafc; }
-.summary-card span { color: #64748b; font-size: 13px; }
-.summary-card strong { display: block; margin-top: 8px; color: #2563eb; font-size: 28px; line-height: 1; }
-.summary-card.warning strong { color: #f59e0b; }
-.summary-card.danger strong { color: #ef4444; }
-.summary-card p { margin: 8px 0 0; color: #94a3b8; font-size: 12px; }
+.model-filter { width: 170px; }
+.question-filter { width: 260px; }
+.effect-question-filter { width: 320px; }
+.time-trigger { height: 34px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid #dbe3ef; border-radius: 7px; background: #fff; color: #111827; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
+.time-trigger:hover { border-color: #93c5fd; color: #2563eb; }
+.trigger-caret { color: #64748b; font-size: 12px; }
+.time-panel { display: flex; flex-direction: column; gap: 4px; padding: 4px; }
+.time-panel > button { height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #111827; text-align: left; font-size: 13px; cursor: pointer; }
+.time-panel > button:hover, .time-panel > button.active { background: #eff6ff; color: #2563eb; font-weight: 800; }
+.time-panel-divider { height: 1px; margin: 6px 0; background: #e5e7eb; }
+.date-range-editor { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 4px; color: #64748b; font-size: 12px; }
+.date-range-editor input { height: 32px; border: 1px solid #dbe3ef; border-radius: 7px; padding: 0 8px; color: #111827; font-family: inherit; }
+.time-panel-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 4px 2px; color: #64748b; font-size: 12px; }
+.time-panel-footer button { height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: #2563eb; color: #fff; font-weight: 800; cursor: pointer; }
 .diff-panel { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 16px; border: 1px solid #dbeafe; border-radius: 8px; background: #eff6ff; margin-bottom: 16px; }
 .panel-title { color: #111827; font-size: 15px; font-weight: 800; }
 .panel-desc { margin-top: 4px; color: #64748b; font-size: 13px; }
@@ -834,6 +1016,7 @@ const dedupeCollectedSources = () => {
 .table-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
 .search-input { width: 360px; }
 .status-filter { width: 150px; }
+.model-filter { width: 140px; }
 .toolbar-spacer { flex: 1; min-width: 16px; }
 .source-table { width: 100%; }
 .source-name { color: #111827; font-weight: 800; }
@@ -860,13 +1043,57 @@ const dedupeCollectedSources = () => {
 .link-status.invalid { color: #dc2626; background: #fee2e2; }
 .link-status.unknown { color: #64748b; background: #f1f5f9; }
 .import-box { display: flex; flex-direction: column; gap: 14px; }
+.upload-panel { position: relative; }
+.template-btn { position: absolute; top: 12px; right: 12px; z-index: 2; background: #fff; }
 .upload-icon { color: #409eff; font-size: 32px; }
 .upload-title { color: #111827; font-weight: 700; }
 .upload-desc { margin-top: 6px; color: #94a3b8; font-size: 12px; }
 .batch-input { width: 100%; }
 .bulk-alert { margin-bottom: 14px; }
+
+.compare-hero { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border: 1px solid #dbeafe; border-radius: 10px; background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%); margin-bottom: 14px; }
+.compare-title { color: #111827; font-size: 17px; font-weight: 900; }
+.compare-desc { margin-top: 5px; color: #64748b; font-size: 13px; }
+.moved-desc { margin: -4px 0 14px; }
+.tab-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 18px; margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 12px; font-weight: 800; background: #f1f5f9; color: #475569; }
+.tab-count.success { background: #dcfce7; color: #15803d; }
+.tab-count.warning { background: #fef3c7; color: #b45309; }
+.tab-count.danger { background: #fee2e2; color: #b91c1c; }
+.compare-kpi-grid { display: grid; grid-template-columns: repeat(6, minmax(120px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.compare-kpi-card { padding: 13px 14px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
+.compare-kpi-card span { display: block; color: #64748b; font-size: 12px; font-weight: 700; }
+.compare-kpi-card strong { display: block; margin-top: 6px; color: #111827; font-size: 26px; line-height: 1; }
+.compare-kpi-card em { display: block; margin-top: 7px; color: #94a3b8; font-size: 12px; font-style: normal; }
+.compare-kpi-card.success strong { color: #16a34a; }
+.compare-kpi-card.warning strong { color: #d97706; }
+.compare-kpi-card.primary strong { color: #2563eb; }
+.compare-kpi-card.danger strong { color: #dc2626; }
+.compare-toolbar { padding-top: 2px; }
+.compare-conclusion { padding: 14px 16px; border: 1px solid #e5e7eb; border-radius: 10px; background: #f8fafc; margin-bottom: 14px; }
+.conclusion-title { color: #111827; font-size: 14px; font-weight: 900; margin-bottom: 8px; }
+.compare-conclusion ol { margin: 0; padding-left: 20px; color: #334155; font-size: 13px; line-height: 1.75; }
+.compare-status-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.compare-status-tabs button { height: 32px; padding: 0 12px; border: 1px solid #dbe3ef; border-radius: 999px; background: #fff; color: #334155; font-size: 13px; font-weight: 800; cursor: pointer; }
+.compare-status-tabs button.active { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+.compare-status-tabs button.success.active { border-color: #16a34a; color: #16a34a; background: #dcfce7; }
+.compare-status-tabs button.warning.active { border-color: #d97706; color: #d97706; background: #fef3c7; }
+.compare-status-tabs button.primary.active { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+.compare-status-tabs button.danger.active { border-color: #dc2626; color: #dc2626; background: #fee2e2; }
+.compare-table { margin-top: 2px; }
+
+
+.source-effect-panel { padding: 14px 16px 16px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; margin-bottom: 14px; }
+.no-own-tab-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.no-own-tab-title { color: #111827; font-size: 15px; font-weight: 900; }
+.effect-summary-tags { display: flex; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
+.effect-tabs :deep(.el-tabs__header) { margin-bottom: 10px; }
+.effect-tabs :deep(.el-tabs__item) { font-size: 14px; font-weight: 800; }
+.effect-alert { margin-bottom: 12px; }
+.effect-table { margin-top: 4px; }
+
 @media (max-width: 1100px) {
-  .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .page-header, .diff-panel { flex-direction: column; align-items: stretch; }
+  .page-header, .diff-panel, .compare-hero, .no-own-tab-toolbar { flex-direction: column; align-items: stretch; }
+  .compare-kpi-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+  .global-model-filter, .effect-question-filter { width: 100%; }
 }
 </style>

@@ -50,8 +50,8 @@
           </template>
           <el-menu-item :index="`/project/${projectId}/config/issue`">问题配置</el-menu-item>
           <el-menu-item :index="`/project/${projectId}/config/competitor`">竞品配置</el-menu-item>
-          <el-menu-item :index="`/project/${projectId}/config/source`">信源管理</el-menu-item>
           <el-menu-item :index="`/project/${projectId}/config/monitor`">监控配置</el-menu-item>
+          <el-menu-item :index="`/project/${projectId}/config/source`">我的信源</el-menu-item>
         </el-menu-item-group>
       </el-menu>
 
@@ -435,7 +435,7 @@ const currentPageTitle = computed(() => {
   const path = route.path
   if (path.includes('/config/issue')) return '问题配置'
   if (path.includes('/config/competitor')) return '竞品配置'
-  if (path.includes('/config/source')) return '信源管理'
+  if (path.includes('/config/source')) return '我的信源'
   if (path.includes('/config/monitor')) return '监控配置'
   if (path.includes('/dashboard')) return '数据概览'
   if (path.includes('/sources')) return '信源统计'

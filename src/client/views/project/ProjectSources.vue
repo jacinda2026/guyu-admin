@@ -1,3 +1,4 @@
+<!-- VERSION: ProjectSources_v20260604_1452 | 信源效果评估新增双趋势图：我的信源引用次数、引用我的信源的问题数量 -->
 <template>
   <div class="sources-container">
     
@@ -20,6 +21,9 @@
         <el-button plain><el-icon><Download /></el-icon> 导出</el-button>
       </div>
     </div>
+
+    <el-tabs v-model="sourcePageTab" class="source-page-tabs">
+      <el-tab-pane label="信源统计" name="stats">
 
     <el-row :gutter="20" class="mb-20">
       <el-col :span="8">
@@ -243,6 +247,179 @@
       </el-table>
     </el-card>
 
+
+      </el-tab-pane>
+
+      <el-tab-pane label="信源效果评估" name="effect">
+        <el-row :gutter="16" class="mb-20 effect-kpi-row">
+          <el-col :span="6">
+            <el-card shadow="never" class="effect-kpi-card">
+              <div class="effect-kpi-title">我的信源</div>
+              <div class="effect-kpi-value">{{ sourceEffectStats.ownSourceTotal }}</div>
+              <div class="effect-kpi-desc">已配置管理</div>
+            </el-card>
+          </el-col>
+          <el-col :span="6">
+            <el-card shadow="never" class="effect-kpi-card warning-card">
+              <div class="effect-kpi-title">未被引用信源</div>
+              <div class="effect-kpi-value">{{ sourceEffectStats.unusedSourceCount }}</div>
+              <div class="effect-kpi-desc">没有被任何模型引用</div>
+            </el-card>
+          </el-col>
+          <el-col :span="6">
+            <el-card shadow="never" class="effect-kpi-card danger-card">
+              <div class="effect-kpi-title">无我的信源问题</div>
+              <div class="effect-kpi-value">{{ sourceEffectStats.noOwnSourceQuestionCount }}</div>
+              <div class="effect-kpi-desc">问题下缺少我的信源</div>
+            </el-card>
+          </el-col>
+          <el-col :span="6">
+            <el-card shadow="never" class="effect-kpi-card primary-card">
+              <div class="effect-kpi-title">信源引用比例</div>
+              <div class="effect-kpi-value small">{{ sourceEffectStats.ownedQuoteText }}</div>
+              <div class="effect-kpi-desc">自有引用/全网引用(排除自有信源)</div>
+            </el-card>
+          </el-col>
+        </el-row>
+
+
+        <el-row :gutter="16" class="mb-20 effect-trend-row">
+          <el-col :span="12">
+            <el-card shadow="never" class="section-card trend-card">
+              <template #header>
+                <div class="section-title">我的信源引用趋势</div>
+              </template>
+              <div ref="ownSourceQuoteTrendChartRef" class="trend-chart"></div>
+            </el-card>
+          </el-col>
+          <el-col :span="12">
+            <el-card shadow="never" class="section-card trend-card">
+              <template #header>
+                <div class="section-title">引用我的信源的问题趋势</div>
+              </template>
+              <div ref="ownSourceQuestionTrendChartRef" class="trend-chart"></div>
+            </el-card>
+          </el-col>
+        </el-row>
+
+        <el-card shadow="never" class="section-card mb-20">
+          <template #header>
+            <div class="section-title">本期结论</div>
+          </template>
+          <ol class="effect-conclusion-list">
+            <li v-for="item in sourceEffectConclusions" :key="item">{{ item }}</li>
+          </ol>
+        </el-card>
+
+        <el-card shadow="never" class="section-card source-effect-card">
+          <el-tabs v-model="sourceEffectTab" class="effect-inner-tabs">
+            <el-tab-pane name="unusedSources">
+              <template #label>未被引用信源 <span class="tab-count warning">{{ unusedOwnSources.length }}</span></template>
+              <el-alert
+                class="effect-alert"
+                type="warning"
+                :closable="false"
+                show-icon
+                title="这些信源已加入我的信源库，但在当前筛选口径下没有被任何大模型回答引用，说明内容尚未进入 AI 答案引用链路。"
+              />
+              <el-table :data="unusedOwnSources" style="width: 100%" size="small" :header-cell-style="{background:'#f8fafc', color:'#64748b'}">
+                <el-table-column type="index" label="#" width="56" align="center" />
+                <el-table-column label="信源名称" min-width="260" show-overflow-tooltip>
+                  <template #default="{row}">
+                    <div class="effect-source-name">{{ row.name }}</div>
+                    <div class="effect-source-url">{{ row.domain || row.url }}</div>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="type" label="类型" width="110" />
+                <el-table-column prop="category" label="所属品牌" width="100" align="center">
+                  <template #default="{row}"><el-tag size="small" effect="plain">{{ row.category }}</el-tag></template>
+                </el-table-column>
+                <el-table-column prop="weight" label="权威等级" width="100" align="center">
+                  <template #default="{row}"><el-tag :type="weightTagType(row.weight)" size="small" effect="plain">{{ row.weight }}</el-tag></template>
+                </el-table-column>
+                <el-table-column label="目标问题" min-width="240">
+                  <template #default="{row}">
+                    <div class="effect-tag-list">
+                      <el-tag v-for="question in row.relatedQuestions" :key="question" size="small" effect="plain">{{ question }}</el-tag>
+                      <span v-if="!row.relatedQuestions.length">-</span>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="目标模型" width="130" align="center">
+                  <template #default="{row}">
+                    <div class="effect-model-list">
+                      <el-tag v-for="model in row.relatedModels" :key="model" size="small" effect="plain">{{ modelLabel(model) }}</el-tag>
+                      <span v-if="!row.relatedModels.length">-</span>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="hitCount" label="当前引用次数" width="116" align="center" />
+                <el-table-column prop="unquotedDays" label="未引用天数" width="108" align="center" />
+                <el-table-column prop="reason" label="原因判断" min-width="180" show-overflow-tooltip />
+                <el-table-column prop="suggestion" label="建议动作" min-width="280" show-overflow-tooltip />
+              </el-table>
+            </el-tab-pane>
+
+            <el-tab-pane name="noOwnSourceQuestions">
+              <template #label>无我的信源问题 <span class="tab-count danger">{{ noOwnSourceQuestions.length }}</span></template>
+              <div class="no-own-question-toolbar">
+                <el-select
+                  v-model="questionFilter"
+                  class="question-filter-select"
+                  placeholder="问题筛选"
+                  multiple
+                  collapse-tags
+                  collapse-tags-tooltip
+                  filterable
+                  clearable
+                >
+                  <el-option v-for="question in allQuestionOptions" :key="question" :label="question" :value="question" />
+                </el-select>
+              </div>
+              <el-alert
+                class="effect-alert"
+                type="error"
+                :closable="false"
+                show-icon
+                title="这些监控问题下，大模型回答没有引用任何我的信源，说明该问题缺少我的内容资产参与，需要加强文章投放。"
+              />
+              <el-table :data="noOwnSourceQuestions" style="width: 100%" size="small" :header-cell-style="{background:'#f8fafc', color:'#64748b'}">
+                <el-table-column type="index" label="#" width="56" align="center" />
+                <el-table-column prop="question" label="监控问题" min-width="300" show-overflow-tooltip />
+                <el-table-column prop="totalSourceCount" label="全网信源数" width="108" align="center" />
+                <el-table-column prop="ownSourceCount" label="我的信源数" width="108" align="center" />
+                <el-table-column prop="ownSourceQuoteCount" label="自有引用次数" width="116" align="center" />
+                <el-table-column label="覆盖模型" min-width="160">
+                  <template #default="{row}">
+                    <div class="effect-tag-list compact">
+                      <el-tag v-for="model in row.models" :key="model" size="small" effect="plain">{{ modelLabel(model) }}</el-tag>
+                      <span v-if="!row.models.length">-</span>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="主要外部信源" min-width="240">
+                  <template #default="{row}">
+                    <div class="effect-tag-list compact">
+                      <el-tag v-for="domain in row.externalDomains.slice(0, 4)" :key="domain" size="small" effect="plain">{{ domain }}</el-tag>
+                      <span v-if="!row.externalDomains.length">-</span>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="status" label="状态" width="120" align="center">
+                  <template #default="{row}"><el-tag :type="row.status === '无我的信源' ? 'danger' : 'success'" size="small" effect="plain">{{ row.status }}</el-tag></template>
+                </el-table-column>
+                <el-table-column prop="suggestion" label="建议动作" min-width="300" show-overflow-tooltip />
+                <el-table-column label="操作" width="110" fixed="right" align="center">
+                  <template #default="{row}">
+                    <el-button link type="primary" @click="oneClickOptimizeQuestion(row)">一键优化</el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </el-tab-pane>
+          </el-tabs>
+        </el-card>
+      </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
@@ -250,11 +427,16 @@
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { Download, DataAnalysis, Platform } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
+import { ElMessage } from 'element-plus'
 
 const filterForm = reactive({
   model: 'all',
   timeRange: '7d'
 })
+
+const sourcePageTab = ref('stats')
+const sourceEffectTab = ref('unusedSources')
+const questionFilter = ref([])
 
 const sourceTab = ref('domain')
 const sourceSearch = ref('')
@@ -557,8 +739,412 @@ const gradeTableData = ref([
 
 // ECharts 初始化
 const donutChartRef = ref(null)
+const ownSourceQuoteTrendChartRef = ref(null)
+const ownSourceQuestionTrendChartRef = ref(null)
+
+const modelLabelMap = {
+  all: '全部模型',
+  doubao: '豆包',
+  deepseek: 'DeepSeek',
+  ernie: '文心一言',
+  kimi: 'Kimi',
+  qianwen: '通义千问',
+  yuanbao: '元宝'
+}
+
+const modelLabel = (model) => modelLabelMap[model] || model
+
+const mySourceList = ref([
+  {
+    id: 1,
+    name: '方程豹钛7产品技术白皮书（2026版）',
+    url: 'https://www.fangchengbao.com/tech-whitepaper-2026',
+    domain: 'fangchengbao.com',
+    type: '白皮书',
+    category: '本品',
+    weight: 'A级',
+    publishTime: '2026-05-10',
+    relatedModels: ['doubao', 'deepseek', 'ernie'],
+    relatedQuestions: ['方程豹钛7质量怎么样？', '方程豹钛7和坦克300哪个好？']
+  },
+  {
+    id: 2,
+    name: '方程豹钛7官方配置页',
+    url: 'https://www.fangchengbao.com/tai7/config',
+    domain: 'fangchengbao.com',
+    type: '官网',
+    category: '本品',
+    weight: 'A级',
+    publishTime: '2026-05-16',
+    relatedModels: ['doubao', 'ernie'],
+    relatedQuestions: ['方程豹钛7值得买吗？', '方程豹钛7适合家用吗？']
+  },
+  {
+    id: 3,
+    name: '钛7车主真实用车体验合集',
+    url: 'https://www.xiaohongshu.com/explore/tai7-owner-review',
+    domain: 'xiaohongshu.com',
+    type: '社媒内容',
+    category: '本品',
+    weight: 'B级',
+    publishTime: '2026-05-20',
+    relatedModels: ['doubao', 'deepseek'],
+    relatedQuestions: ['方程豹钛7口碑怎么样？', '方程豹钛7真实油耗怎么样？']
+  },
+  {
+    id: 4,
+    name: '方盒子SUV选购指南：钛7与主流竞品对比',
+    url: 'https://zhuanlan.zhihu.com/p/tai7-suv-guide',
+    domain: 'zhihu.com',
+    type: '知乎内容',
+    category: '本品',
+    weight: 'B级',
+    publishTime: '2026-05-22',
+    relatedModels: ['deepseek', 'ernie'],
+    relatedQuestions: ['方程豹钛7和坦克300哪个好？', '方盒子SUV怎么选？']
+  },
+  {
+    id: 5,
+    name: '方程豹钛7售后与三电质保说明',
+    url: 'https://www.fangchengbao.com/service/warranty',
+    domain: 'fangchengbao.com',
+    type: '官网',
+    category: '本品',
+    weight: 'A级',
+    publishTime: '2026-05-24',
+    relatedModels: ['doubao', 'deepseek', 'ernie'],
+    relatedQuestions: ['方程豹钛7售后怎么样？', '方程豹钛7质量怎么样？']
+  }
+])
+
+const effectCollectedSources = computed(() => {
+  const mediaRows = mediaSourceTable.value.map((item, index) => ({
+    id: `media-${index}`,
+    title: item.title,
+    url: item.url,
+    domain: getMediaHost(item.url),
+    type: item.type,
+    rangeCount: Number(item.usageCount || item.mentionCount || 0),
+    models: index % 3 === 0 ? ['doubao', 'deepseek'] : index % 3 === 1 ? ['ernie'] : ['doubao', 'ernie'],
+    questions: index % 4 === 0
+      ? ['方程豹钛7质量怎么样？', '方程豹钛7值得买吗？']
+      : index % 4 === 1
+        ? ['方程豹钛7和坦克300哪个好？']
+        : index % 4 === 2
+          ? ['方程豹钛7口碑怎么样？']
+          : ['方盒子SUV怎么选？'],
+    riskTag: /投诉|负面|质量/.test(item.title) ? '风险信源' : '正常'
+  }))
+
+  return [
+    ...mediaRows,
+    {
+      id: 'owned-official-config',
+      title: '方程豹钛7官方配置页',
+      url: 'https://www.fangchengbao.com/tai7/config',
+      domain: 'fangchengbao.com',
+      type: '官网',
+      rangeCount: 18,
+      models: ['doubao', 'ernie'],
+      questions: ['方程豹钛7值得买吗？', '方程豹钛7适合家用吗？'],
+      riskTag: '正常'
+    },
+    {
+      id: 'owned-xhs-review',
+      title: '钛7车主真实用车体验合集',
+      url: 'https://www.xiaohongshu.com/explore/tai7-owner-review',
+      domain: 'xiaohongshu.com',
+      type: '社媒内容',
+      rangeCount: 9,
+      models: ['doubao', 'deepseek'],
+      questions: ['方程豹钛7口碑怎么样？', '方程豹钛7真实油耗怎么样？'],
+      riskTag: '正常'
+    }
+  ]
+})
+
+const filteredEffectCollectedSources = computed(() => {
+  if (filterForm.model === 'all') return effectCollectedSources.value
+  return effectCollectedSources.value.filter(item => (item.models || []).includes(filterForm.model))
+})
+
+const parseSourceDomain = (value = '') => {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  try {
+    return new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).hostname.toLowerCase().replace(/^www\./, '')
+  } catch (e) {
+    return raw.replace(/^https?:\/\//i, '').split('/')[0].toLowerCase().replace(/^www\./, '')
+  }
+}
+
+const getRootDomain = (value = '') => {
+  const domain = parseSourceDomain(value).replace(/^m\./, '')
+  const platformDomains = ['zhihu.com', 'xiaohongshu.com', 'jd.com', 'baidu.com', 'autohome.com.cn', 'dongchedi.com', 'yiche.com', 'pcauto.com.cn', 'fangchengbao.com']
+  const matched = platformDomains.find(item => domain === item || domain.endsWith(`.${item}`))
+  if (matched) return matched
+  const cnSuffixes = ['com.cn', 'net.cn', 'org.cn', 'gov.cn']
+  const parts = domain.split('.').filter(Boolean)
+  if (parts.length <= 2) return domain
+  const suffix2 = parts.slice(-2).join('.')
+  if (cnSuffixes.includes(suffix2) && parts.length >= 3) return parts.slice(-3).join('.')
+  return parts.slice(-2).join('.')
+}
+
+const isSameSource = (own, collected) => {
+  const ownRaw = own.url || own.domain || ''
+  const collectedRaw = collected.url || collected.domain || ''
+  const ownUrl = /^https?:\/\//i.test(ownRaw) ? ownRaw.toLowerCase() : `https://${ownRaw}`.toLowerCase()
+  const collectedUrl = /^https?:\/\//i.test(collectedRaw) ? collectedRaw.toLowerCase() : `https://${collectedRaw}`.toLowerCase()
+  if (ownRaw && collectedRaw && ownUrl === collectedUrl) return true
+  return getRootDomain(ownRaw) && getRootDomain(ownRaw) === getRootDomain(collectedRaw)
+}
+
+const daysBetween = (date) => {
+  const start = new Date(date)
+  const end = new Date('2026-06-04')
+  if (Number.isNaN(start.getTime())) return '-'
+  return Math.max(0, Math.ceil((end - start) / (24 * 60 * 60 * 1000)))
+}
+
+const sourceEffectSuggestion = (source) => {
+  const type = source.type || ''
+  if (type.includes('官网')) return '补充 FAQ、产品参数、适用场景、品牌背书和竞品对比内容，并提升页面可抓取性。'
+  if (type.includes('白皮书')) return '将白皮书拆成多篇可搜索文章，并分发到第三方媒体、知乎和行业平台。'
+  if (type.includes('知乎')) return '改成问题型标题，补充真实场景、对比信息和品牌差异化答案。'
+  if (type.includes('小红书') || type.includes('社媒')) return '增加体验、测评、避坑、对比类内容，并围绕监控问题设置标题和正文关键词。'
+  return '围绕目标问题补充结构化内容、外部分发和引用链路建设。'
+}
+
+const questionEffectSuggestion = (question) => {
+  if (/评价|口碑|真实/i.test(question)) return '建议发布口碑、真实评价、用户反馈、测评体验类内容，并优先布局知乎、小红书和电商问答。'
+  if (/哪个|推荐|排行|排名|品牌|怎么选/i.test(question)) return '建议发布榜单、选购指南、横向对比和第三方测评内容，争取进入推荐类答案信源。'
+  if (/安全|质量|功效|效果|配置|适合/i.test(question)) return '建议发布质量说明、检测报告、技术白皮书、专家背书和适用场景内容。'
+  if (/售后|质保|渠道/i.test(question)) return '建议补充售后政策、质保条款、官方渠道和服务保障说明。'
+  return '建议围绕该问题新增专题文章、FAQ 页面、第三方媒体稿和社媒内容投放。'
+}
+
+const allQuestionOptions = computed(() => {
+  const set = new Set()
+  mySourceList.value.forEach(item => (item.relatedQuestions || []).forEach(question => set.add(question)))
+  filteredEffectCollectedSources.value.forEach(item => (item.questions || []).forEach(question => set.add(question)))
+  return Array.from(set).filter(Boolean)
+})
+
+const activeQuestionOptions = computed(() => questionFilter.value.length ? questionFilter.value : allQuestionOptions.value)
+
+const ownSourceEffectRows = computed(() => {
+  return mySourceList.value.map(source => {
+    const hits = filteredEffectCollectedSources.value.filter(collected => isSameSource(source, collected))
+    const hitCount = hits.reduce((sum, item) => sum + Number(item.rangeCount || 0), 0)
+    return {
+      ...source,
+      hitCount,
+      unquotedDays: hitCount > 0 ? 0 : daysBetween(source.publishTime),
+      reason: hitCount > 0 ? '已进入 AI 答案引用链路' : (source.weight === 'A级' ? '重点信源未被引用，疑似收录或分发不足' : '内容未进入当前监测问题的引用链路'),
+      suggestion: hitCount > 0 ? '持续观察引用次数、模型覆盖和情感变化。' : sourceEffectSuggestion(source)
+    }
+  })
+})
+
+const usedOwnSources = computed(() => ownSourceEffectRows.value.filter(item => item.hitCount > 0))
+const unusedOwnSources = computed(() => ownSourceEffectRows.value.filter(item => item.hitCount === 0))
+
+const questionSourceCoverage = computed(() => {
+  return activeQuestionOptions.value.map(question => {
+    const questionSources = filteredEffectCollectedSources.value.filter(source => (source.questions || []).includes(question))
+    const ownHits = questionSources.filter(collected => mySourceList.value.some(own => isSameSource(own, collected)))
+    const models = Array.from(new Set(questionSources.flatMap(item => item.models || [])))
+    const externalDomains = Array.from(new Set(questionSources.map(item => item.domain || parseSourceDomain(item.url)).filter(Boolean)))
+    const ownSourceQuoteCount = ownHits.reduce((sum, item) => sum + Number(item.rangeCount || 0), 0)
+    return {
+      question,
+      totalSourceCount: questionSources.length,
+      ownSourceCount: ownHits.length,
+      ownSourceQuoteCount,
+      models,
+      externalDomains,
+      status: ownHits.length > 0 ? '有我的信源' : '无我的信源',
+      suggestion: ownHits.length > 0 ? '该问题已有我的信源参与，可继续提升引用次数和模型覆盖。' : questionEffectSuggestion(question)
+    }
+  })
+})
+
+const noOwnSourceQuestions = computed(() => questionSourceCoverage.value.filter(item => item.ownSourceCount === 0))
+
+const sourceEffectStats = computed(() => {
+  const allQuoteCount = filteredEffectCollectedSources.value.reduce((sum, item) => sum + Number(item.rangeCount || 0), 0)
+  const ownQuoteCount = usedOwnSources.value.reduce((sum, item) => sum + Number(item.hitCount || 0), 0)
+  return {
+    ownSourceTotal: mySourceList.value.length,
+    unusedSourceCount: unusedOwnSources.value.length,
+    noOwnSourceQuestionCount: noOwnSourceQuestions.value.length,
+    ownedQuoteText: `${ownQuoteCount}/${allQuoteCount}`
+  }
+})
+
+const sourceEffectConclusions = computed(() => {
+  const result = []
+  result.push(`当前我的信源共 ${mySourceList.value.length} 条，未被引用 ${unusedOwnSources.value.length} 条，自有引用/全网引用为 ${sourceEffectStats.value.ownedQuoteText}。`)
+  if (unusedOwnSources.value.length > 0) result.push(`当前有 ${unusedOwnSources.value.length} 条我的信源未被任何大模型回答引用，建议优先优化 A级信源和重点问题相关内容。`)
+  if (noOwnSourceQuestions.value.length > 0) result.push(`当前有 ${noOwnSourceQuestions.value.length} 个监控问题没有引用任何我的信源，建议围绕这些问题加强文章投放和外部平台分发。`)
+  if (!unusedOwnSources.value.length && !noOwnSourceQuestions.value.length) result.push('当前我的信源引用效果较健康，可继续观察模型覆盖和引用次数变化。')
+  return result
+})
+
+
+const getEffectDateList = () => {
+  const days = filterForm.timeRange === '30d' ? 30 : 7
+  const end = new Date('2026-06-04')
+  return Array.from({ length: days }).map((_, index) => {
+    const date = new Date(end)
+    date.setDate(end.getDate() - (days - 1 - index))
+    const yyyy = date.getFullYear()
+    const mm = String(date.getMonth() + 1).padStart(2, '0')
+    const dd = String(date.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  })
+}
+
+const formatTrendDateLabel = (date) => {
+  const [, month, day] = String(date).split('-')
+  return `${Number(month)}/${Number(day)}`
+}
+
+const getDailyQuoteCount = (source, date, dateIndex, totalDays) => {
+  const dailyItems = source.dailyStats || source.dailyData || source.trend || []
+  if (Array.isArray(dailyItems) && dailyItems.length) {
+    const matched = dailyItems.find(item => item.date === date || item.day === date)
+    if (matched) return Number(matched.count || matched.quoteCount || matched.value || 0)
+  }
+
+  const sourceDate = source.date || source.collectedAt || source.createdAt
+  if (sourceDate && String(sourceDate).slice(0, 10) === date) {
+    return Number(source.rangeCount || source.usageCount || source.mentionCount || 0)
+  }
+
+  const total = Number(source.rangeCount || source.usageCount || source.mentionCount || 0)
+  if (!total || !totalDays) return 0
+  const seed = String(source.id || source.title || source.domain || '').split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)
+  const base = Math.floor(total / totalDays)
+  const remainder = total % totalDays
+  return base + (((dateIndex + seed) % totalDays) < remainder ? 1 : 0)
+}
+
+const ownHitCollectedSources = computed(() => {
+  return filteredEffectCollectedSources.value.filter(collected => mySourceList.value.some(own => isSameSource(own, collected)))
+})
+
+const ownSourceQuoteTrendData = computed(() => {
+  const dates = getEffectDateList()
+  return dates.map((date, dateIndex) => {
+    const quoteCount = ownHitCollectedSources.value.reduce((sum, item) => {
+      return sum + getDailyQuoteCount(item, date, dateIndex, dates.length)
+    }, 0)
+    return {
+      date,
+      label: formatTrendDateLabel(date),
+      quoteCount
+    }
+  })
+})
+
+const ownSourceQuestionTrendData = computed(() => {
+  const dates = getEffectDateList()
+  return dates.map((date, dateIndex) => {
+    const questionSet = new Set()
+    ownHitCollectedSources.value.forEach(item => {
+      const dailyCount = getDailyQuoteCount(item, date, dateIndex, dates.length)
+      if (dailyCount > 0) {
+        ;(item.questions || []).forEach(question => questionSet.add(question))
+      }
+    })
+    return {
+      date,
+      label: formatTrendDateLabel(date),
+      questionCount: questionSet.size
+    }
+  })
+})
+
+const weightTagType = (weight) => {
+  if (weight === 'A级') return 'warning'
+  if (weight === 'B级') return 'primary'
+  return 'info'
+}
+
+const oneClickOptimizeQuestion = (row) => {
+  ElMessage.success(`已生成「${row.question}」的信源优化任务草稿`)
+}
+
 let donutChartInst = null
-const handleResize = () => donutChartInst?.resize()
+let ownSourceQuoteTrendChartInst = null
+let ownSourceQuestionTrendChartInst = null
+
+const handleResize = () => {
+  donutChartInst?.resize()
+  ownSourceQuoteTrendChartInst?.resize()
+  ownSourceQuestionTrendChartInst?.resize()
+}
+
+const buildLineChartOption = ({ title, data, valueKey, seriesName, yAxisName }) => ({
+  tooltip: { trigger: 'axis' },
+  grid: { left: 42, right: 20, top: 42, bottom: 32 },
+  xAxis: {
+    type: 'category',
+    boundaryGap: false,
+    data: data.map(item => item.label),
+    axisLine: { lineStyle: { color: '#e5e7eb' } },
+    axisTick: { show: false },
+    axisLabel: { color: '#64748b', fontSize: 11 }
+  },
+  yAxis: {
+    type: 'value',
+    name: yAxisName,
+    minInterval: 1,
+    nameTextStyle: { color: '#64748b', fontSize: 11, padding: [0, 0, 0, 6] },
+    splitLine: { lineStyle: { color: '#eef2f7' } },
+    axisLabel: { color: '#64748b', fontSize: 11 }
+  },
+  series: [{
+    name: seriesName,
+    type: 'line',
+    smooth: true,
+    symbol: 'circle',
+    symbolSize: 7,
+    data: data.map(item => item[valueKey]),
+    label: { show: true, position: 'top', color: '#1f2937', fontSize: 11 },
+    lineStyle: { width: 3 },
+    areaStyle: { opacity: 0.08 },
+    emphasis: { focus: 'series' }
+  }]
+})
+
+const initTrendCharts = () => {
+  if (ownSourceQuoteTrendChartRef.value) {
+    ownSourceQuoteTrendChartInst?.dispose()
+    ownSourceQuoteTrendChartInst = echarts.init(ownSourceQuoteTrendChartRef.value)
+    ownSourceQuoteTrendChartInst.setOption(buildLineChartOption({
+      title: '我的信源引用趋势',
+      data: ownSourceQuoteTrendData.value,
+      valueKey: 'quoteCount',
+      seriesName: '引用次数',
+      yAxisName: '引用次数'
+    }))
+  }
+
+  if (ownSourceQuestionTrendChartRef.value) {
+    ownSourceQuestionTrendChartInst?.dispose()
+    ownSourceQuestionTrendChartInst = echarts.init(ownSourceQuestionTrendChartRef.value)
+    ownSourceQuestionTrendChartInst.setOption(buildLineChartOption({
+      title: '引用我的信源的问题数量趋势',
+      data: ownSourceQuestionTrendData.value,
+      valueKey: 'questionCount',
+      seriesName: '问题数量',
+      yAxisName: '问题数量'
+    }))
+  }
+}
 
 const initCharts = () => {
   if (donutChartRef.value) {
@@ -591,6 +1177,9 @@ const initCharts = () => {
       ]
     })
   }
+  if (sourcePageTab.value === 'effect') {
+    nextTick(() => initTrendCharts())
+  }
 }
 
 onMounted(() => {
@@ -618,9 +1207,25 @@ watch(domainAggregate, async (isAggregate) => {
   }
 })
 
+watch(sourcePageTab, async (tab) => {
+  if (tab === 'effect') {
+    await nextTick()
+    initTrendCharts()
+  }
+})
+
+watch([ownSourceQuoteTrendData, ownSourceQuestionTrendData], async () => {
+  if (sourcePageTab.value === 'effect') {
+    await nextTick()
+    initTrendCharts()
+  }
+})
+
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
   donutChartInst?.dispose()
+  ownSourceQuoteTrendChartInst?.dispose()
+  ownSourceQuestionTrendChartInst?.dispose()
 })
 </script>
 
@@ -746,4 +1351,39 @@ onUnmounted(() => {
 .grade-text-A { color: #f59e0b; }
 .grade-text-B { color: #10b981; }
 .grade-text-C { color: #64748b; }
+
+.source-page-tabs { background: transparent; }
+.source-page-tabs :deep(.el-tabs__header) { margin: 0 0 16px; background: #fff; border-radius: 8px; padding: 0 16px; border: 1px solid #e5e7eb; }
+.source-page-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
+.effect-kpi-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px 0; }
+.effect-kpi-title { font-size: 13px; color: #64748b; margin-bottom: 8px; }
+.effect-kpi-value { font-size: 28px; font-weight: 800; color: #111827; line-height: 1.1; }
+.effect-kpi-value.small { font-size: 24px; }
+.effect-kpi-desc { margin-top: 6px; font-size: 12px; color: #94a3b8; }
+.effect-kpi-card.warning-card .effect-kpi-value { color: #f59e0b; }
+.effect-kpi-card.danger-card .effect-kpi-value { color: #ef4444; }
+.effect-kpi-card.primary-card .effect-kpi-value { color: #2563eb; }
+.effect-desc { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 16px; color: #64748b; font-size: 13px; }
+.effect-conclusion-list { margin: 0; padding-left: 20px; color: #334155; font-size: 13px; line-height: 1.9; }
+.effect-trend-row { align-items: stretch; }
+.trend-card { height: 100%; }
+.trend-card :deep(.el-card__header) { padding: 12px 16px; border-bottom: 1px solid #e5e7eb; }
+.trend-card :deep(.el-card__body) { padding: 8px 12px 12px; }
+.trend-chart { width: 100%; height: 260px; }
+.source-effect-card { border-radius: 8px; border: 1px solid #e5e7eb; }
+.source-effect-card :deep(.el-card__body) { padding: 12px 16px 16px; }
+.effect-inner-tabs :deep(.el-tabs__header) { margin-bottom: 14px; }
+.tab-count { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 6px; margin-left: 4px; border-radius: 9px; font-size: 12px; font-weight: 700; background: #f1f5f9; color: #64748b; }
+.tab-count.warning { background: #fff7ed; color: #f59e0b; }
+.tab-count.danger { background: #fef2f2; color: #ef4444; }
+.effect-alert { margin-bottom: 12px; }
+.effect-source-name { font-weight: 600; color: #1e293b; }
+.effect-source-url { margin-top: 3px; font-size: 12px; color: #94a3b8; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.effect-tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.effect-tag-list.compact { gap: 4px; max-height: 52px; overflow: hidden; }
+.effect-model-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+.no-own-question-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.no-own-question-title { font-size: 14px; font-weight: 700; color: #1e293b; }
+.question-filter-select { width: 360px; }
+
 </style>
