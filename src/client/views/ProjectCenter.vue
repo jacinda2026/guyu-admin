@@ -60,6 +60,15 @@
 
         <el-table-column prop="updateTime" label="数据更新" align="center" width="160" />
         <el-table-column prop="createTime" label="创建时间" align="center" width="120" />
+        <el-table-column label="操作" align="center" width="210" fixed="right">
+          <template #default="{ row }">
+            <div class="table-actions">
+              <el-button link type="primary" @click="stopProject(row)">停止</el-button>
+              <el-button link type="primary" @click="runProjectNow(row)">手动执行</el-button>
+              <el-button link type="danger" @click="deleteProject(row)">删除</el-button>
+            </div>
+          </template>
+        </el-table-column>
       </el-table>
 
       <div class="pagination-wrapper">
@@ -569,6 +578,96 @@ const enterProjectWorkspace = (row) => {
   router.push(`/project/${projectId}/dashboard`)
 }
 
+const formatNow = () => {
+  const now = new Date()
+  return `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
+}
+
+const isSameDay = (left, right) => {
+  return left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+}
+
+const estimateManualRunCost = (row) => {
+  const questionCount = Number(row.questionCount) || 0
+  const modelCount = Array.isArray(row.models) ? row.models.length : 0
+  return (questionCount * modelCount * 0.1).toFixed(2)
+}
+
+const stopProject = async (row) => {
+  try {
+    await ElMessageBox.confirm(
+      '停止后，不会自动执行监控任务，后续仍可以手动执行任务',
+      '停止定时任务',
+      {
+        confirmButtonText: '确认停止',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+  } catch (error) {
+    return
+  }
+  row.status = '停止'
+  ElMessage.success(`已停止项目「${row.projectName}」的自动监控，仍可手动执行`)
+}
+
+const runProjectNow = async (row) => {
+  const now = new Date()
+  const lastRunAt = row.lastManualRunAt ? new Date(row.lastManualRunAt) : null
+  const minutesSinceLastRun = lastRunAt ? Math.floor((now.getTime() - lastRunAt.getTime()) / 60000) : null
+  const hasRunToday = lastRunAt && isSameDay(now, lastRunAt)
+  const confirmMessage = hasRunToday
+    ? minutesSinceLastRun <= 30
+      ? `项目「${row.projectName}」在 ${minutesSinceLastRun || 1} 分钟内已经手动执行过一次，是否继续执行？`
+      : `项目「${row.projectName}」今天已经手动执行过一次，是否继续执行？`
+    : `确认立即手动执行项目「${row.projectName}」？`
+  const runCost = estimateManualRunCost(row)
+
+  try {
+    setBillingConfirmTip(`本次执行预计消耗 ¥${runCost}`)
+    await ElMessageBox.confirm(confirmMessage, '手动执行确认', {
+      confirmButtonText: '确认执行',
+      cancelButtonText: '取消',
+      type: hasRunToday ? 'warning' : 'info',
+      customClass: 'billing-confirm-box'
+    })
+  } catch (error) {
+    return
+  } finally {
+    clearBillingConfirmTip()
+  }
+
+  row.lastManualRunAt = now.toISOString()
+  row.updateTime = formatNow()
+  ElMessage.success(`已手动执行项目：${row.projectName}`)
+}
+
+const setBillingConfirmTip = (content) => {
+  document.documentElement.style.setProperty('--billing-confirm-tip', `"${content}"`)
+}
+
+const clearBillingConfirmTip = () => {
+  document.documentElement.style.removeProperty('--billing-confirm-tip')
+}
+
+const deleteProject = async (row) => {
+  try {
+    await ElMessageBox.confirm(`删除后将移除项目「${row.projectName}」，相关监控任务也将不再展示。是否确认删除？`, '删除项目', {
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+      confirmButtonClass: 'el-button--danger'
+    })
+  } catch (error) {
+    return
+  }
+  const index = tableData.value.findIndex(item => item.id === row.id)
+  if (index > -1) tableData.value.splice(index, 1)
+  ElMessage.success('项目已删除')
+}
+
 const openCreateProject = () => {
   resetCreateForm()
   createDialogVisible.value = true
@@ -885,6 +984,10 @@ const saveCreateProject = async () => {
 .status-text { font-size: 13px; font-weight: 500; }
 .text-success { color: #0f9f59; font-weight: 700; }
 .text-muted { color: #909399; }
+.table-actions { display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
+.table-actions :deep(.el-button) { margin-left: 0; padding: 0; }
+:global(.billing-confirm-box .el-message-box__btns) { display: flex; align-items: center; gap: 10px; }
+:global(.billing-confirm-box .el-message-box__btns::before) { content: var(--billing-confirm-tip); margin-right: auto; color: #dc2626; font-size: 15px; font-weight: 900; }
 .pagination-wrapper { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; padding-top: 16px; }
 .total-text { font-size: 13px; color: #909399; }
 :deep(.el-pagination.is-background .el-pager li:not(.is-disabled).is-active) { background-color: #2b65f0; }
