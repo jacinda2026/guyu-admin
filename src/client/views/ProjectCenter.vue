@@ -83,7 +83,7 @@
     >
       <template #header>
         <div class="create-dialog-header">
-          <span class="create-dialog-title">创建项目</span>
+          <span class="create-dialog-title">创建品牌项目</span>
           <span class="create-dialog-tip">项目信息创建后，支持在配置中心修改。</span>
         </div>
       </template>
@@ -165,6 +165,7 @@
           <div class="section-bar">
             <div class="section-title title-with-count">问题管理 <span class="section-count">共{{ createForm.questions.length}}个问题</span></div>
             <div class="section-actions question-actions">
+              <el-button type="primary" plain @click="openQuestionExpandTool">AI拓词</el-button>
               <el-button type="primary" @click="openQuestionDialog">+ 添加问题</el-button>
             </div>
           </div>
@@ -689,6 +690,10 @@ const confirmBatchCompetitors = () => {
 const openQuestionDialog = () => {
   batchQuestionText.value = ''
   questionDialogVisible.value = true
+}
+
+const openQuestionExpandTool = () => {
+  window.open('https://g6h7wzq7r2.coze.site/', '_blank', 'noopener,noreferrer')
 }
 
 const confirmBatchQuestions = () => {

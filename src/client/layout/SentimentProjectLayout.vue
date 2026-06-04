@@ -44,7 +44,7 @@
           <el-menu-item :index="`/sentiment-project/${projectId}/question-list`">问题列表</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/conversations`">对话管理</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/tasks`">监控任务</el-menu-item>
-          <el-menu-item :index="`/sentiment-project/${projectId}/reports`">舆情报告</el-menu-item>
+          <el-menu-item :index="`/sentiment-project/${projectId}/reports`">导出中心</el-menu-item>
         </el-menu-item-group>
 
         <el-menu-item-group>
@@ -133,7 +133,7 @@ const pageTitleMap = {
   conversations: '对话管理',
   questions: '舆情问题',
   tasks: '监控任务',
-  reports: '舆情报告',
+  reports: '导出中心',
   config: '配置中心'
 }
 

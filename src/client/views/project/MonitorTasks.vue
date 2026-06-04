@@ -119,6 +119,11 @@
         </div>
       </template>
       <el-table :data="filteredReports" class="report-table" style="width: 100%" :header-cell-style="headerCellStyle">
+        <el-table-column label="报告名称" min-width="280" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span class="report-name-cell">{{ getReportFileName(row.type, row) }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="报告类型" width="112" align="center">
           <template #default="{ row }">
             <el-tag effect="plain" size="small">{{ reportTypeText[row.type] }}</el-tag>
@@ -131,7 +136,6 @@
         <el-table-column label="平均顺位" width="92" align="center">
           <template #default="{ row }"><span :class="row.rankPassed ? 'pass-text' : 'fail-text'">{{ row.avgRank }}</span></template>
         </el-table-column>
-        <el-table-column prop="runCount" label="任务数" width="80" align="center" />
         <el-table-column v-if="isMonthlyDaysEnabled" label="达标天数" width="110" align="center">
           <template #default="{ row }">{{ row.qualifiedDays ?? '-' }}</template>
         </el-table-column>
@@ -829,7 +833,7 @@ const getReportPeriodRange = (type, period) => {
   if (!period) return ['', '']
   if (period.includes(' 至 ')) return period.split(' 至 ')
   if (type === 'daily') return [period, period]
-  if (type === 'monthly') return getMonthRange(period)
+  if (type === 'monthly') return getMonthRange(period.slice(0, 7))
   return [period, period]
 }
 const getReportFileName = (type, row) => {
@@ -1118,8 +1122,8 @@ const reports = reactive({
     { type: 'weekly', period: '2026-05-18 至 2026-05-24', status: 'done', createdAt: '2026-05-24 18:00', completedAt: '2026-05-24 18:06', mentionRate: 71.8, avgRank: 2.9, runCount: 6, qualifiedDays: 4, summary: '本周已有 4 天达标' }
   ],
   monthly: [
-    { type: 'monthly', period: '2026-05', status: 'generating', createdAt: '2026-05-22 18:30', completedAt: '-', mentionRate: 72.1, avgRank: 2.9, runCount: 22, qualifiedDays: 18, summary: '距离月度 22 天目标还差 4 天' },
-    { type: 'monthly', period: '2026-04', status: 'done', createdAt: '2026-04-30 18:00', completedAt: '2026-04-30 18:08', mentionRate: 73.6, avgRank: 2.7, runCount: 30, qualifiedDays: 23, summary: '月度达标天数满足要求' }
+    { type: 'monthly', period: '2026-05-01 至 2026-05-22', status: 'generating', createdAt: '2026-05-22 18:30', completedAt: '-', mentionRate: 72.1, avgRank: 2.9, runCount: 22, qualifiedDays: 18, summary: '距离月度 22 天目标还差 4 天' },
+    { type: 'monthly', period: '2026-04-01 至 2026-04-30', status: 'done', createdAt: '2026-04-30 18:00', completedAt: '2026-04-30 18:08', mentionRate: 73.6, avgRank: 2.7, runCount: 30, qualifiedDays: 23, summary: '月度达标天数满足要求' }
   ],
   custom: [
     { type: 'custom', period: '2026-05-10 至 2026-05-22', status: 'failed', createdAt: '2026-05-22 19:10', completedAt: '2026-05-22 19:11', mentionRate: 70.9, avgRank: 3.1, runCount: 13, qualifiedDays: 8, summary: '指定时间段内提及率达标，平均顺位略低于目标' }
@@ -1449,6 +1453,7 @@ const handleExportReport = (type, row) => {
 .model-tags, .mention-tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .pass-text { color: #059669; font-weight: 700; }
 .fail-text { color: #dc2626; font-weight: 700; }
+.report-name-cell { color: #1f2937; font-weight: 700; }
 .report-summary { margin-left: 8px; color: #64748b; font-size: 13px; }
 .manual-report-form { padding-top: 2px; }
 .manual-report-form :deep(.el-form-item) { margin-bottom: 18px; }

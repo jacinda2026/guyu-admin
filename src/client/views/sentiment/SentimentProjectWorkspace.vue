@@ -13,7 +13,6 @@
       </div>
       <div class="info-group">
         <div class="info-item"><span>监控模型：</span><strong>6个</strong></div>
-        <div class="info-item"><span>风险等级：</span><strong class="danger-text">{{ currentProject.riskLevel }}</strong></div>
         <div class="info-item"><span>今日任务进度：</span><strong>36/72</strong></div>
       </div>
       <div class="info-group actions">
@@ -35,204 +34,156 @@
           <el-radio-button label="30d">最近30天</el-radio-button>
           <el-radio-button label="custom">自定义时间段</el-radio-button>
         </el-radio-group>
-        <el-select v-model="filterState.risk" style="width: 150px;">
-          <el-option label="全部风险" value="all" />
-          <el-option label="高风险" value="high" />
-          <el-option label="中风险" value="medium" />
-          <el-option label="低风险" value="low" />
-        </el-select>
-        <div class="selected-info">最近7天：2026-05-23 ~ 2026-05-29</div>
+        <div class="selected-info">{{ selectedRangeText }}</div>
       </div>
     </div>
 
     <template v-if="section === 'overview'">
-      <el-row :gutter="16" class="mb-16">
-        <el-col :span="6" v-for="item in overviewCards" :key="item.label">
-          <el-card shadow="never" class="metric-card">
+      <div class="overview-top-grid mb-16">
+        <div class="overview-metric-matrix">
+          <el-card v-for="item in overviewCards" :key="item.label" shadow="never" class="metric-card compact-metric">
             <div class="metric-label">{{ item.label }}</div>
             <div class="metric-value" :class="item.type">{{ item.value }}</div>
-            <div class="metric-desc">{{ item.desc }}</div>
-          </el-card>
-        </el-col>
-      </el-row>
-
-      <div class="overview-section-title">
-        <strong>风险语义概览</strong>
-        <span>先看正负面表达的关键词分布，快速判断当前舆情语义方向。</span>
-      </div>
-      <el-row :gutter="16" class="word-cloud-row mb-16">
-        <el-col :span="12">
-          <el-card shadow="never" class="content-card">
-            <template #header><div class="card-head"><span>正面词云</span></div></template>
-            <div class="word-cloud positive-cloud">
-              <span
-                v-for="word in positiveWords"
-                :key="word.text"
-                :class="`size-${word.size}`"
-                :style="{ left: word.left + '%', top: word.top + '%' }"
-              >{{ word.text }}</span>
+            <div v-if="item.secondary" class="metric-secondary">
+              <span>{{ item.secondary.label }}</span>
+              <strong>{{ item.secondary.value }}</strong>
+            </div>
+            <div v-if="item.desc" class="metric-desc">{{ item.desc }}</div>
+            <div v-if="item.tags?.length" class="metric-tags">
+              <el-tag
+                v-for="tag in item.tags"
+                :key="tag.label || tag"
+                size="small"
+                effect="plain"
+                :type="tag.type || ''"
+                :class="tag.level ? `source-weight-${tag.level}` : ''"
+              >
+                {{ tag.label || tag }}
+              </el-tag>
             </div>
           </el-card>
-        </el-col>
-        <el-col :span="12">
-          <el-card shadow="never" class="content-card">
-            <template #header><div class="card-head"><span>负面词云</span></div></template>
-            <div class="word-cloud negative-cloud">
-              <span
-                v-for="word in negativeWords"
-                :key="word.text"
-                :class="`size-${word.size}`"
-                :style="{ left: word.left + '%', top: word.top + '%' }"
-              >{{ word.text }}</span>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
-
-      <div class="overview-section-title">
-        <strong>线索聚合</strong>
-        <span>把新发布内容和长期被 AI 引用的历史信源分开看，便于判断是否预警或深钻。</span>
-      </div>
-      <el-card shadow="never" class="content-card clue-pool-card mb-16">
-        <template #header>
-          <div class="card-head">
-            <div>
-              <span>舆情线索池</span>
-              <small>区分新发信源线索和长期影响 AI 认知的线索</small>
-            </div>
-            <button class="view-link">查看全部 →</button>
-          </div>
-        </template>
-        <div class="clue-summary">
-          <div v-for="item in currentCluePoolCards" :key="item.label" class="clue-summary-item">
-            <span>{{ item.label }}</span>
-            <strong :class="item.type">{{ item.value }}</strong>
-            <p>{{ item.desc }}</p>
-          </div>
         </div>
-        <el-tabs v-model="cluePoolActiveTab" class="clue-tabs">
-          <el-tab-pane label="新发信源线索" name="new">
-            <el-table :data="opinionClueRows" stripe size="small" :header-cell-style="headerCellStyle">
-              <el-table-column prop="clue" label="舆情线索" min-width="150" show-overflow-tooltip>
-                <template #default="{ row }">
-                  <strong class="clue-title">{{ row.clue }}</strong>
-                </template>
-              </el-table-column>
-              <el-table-column prop="relatedContent" label="关联内容" min-width="260" show-overflow-tooltip />
-              <el-table-column prop="platforms" label="关联平台" min-width="180">
-                <template #default="{ row }">
-                  <div class="keyword-tags">
-                    <el-tag v-for="platform in row.platforms" :key="platform" size="small" effect="plain">{{ platform }}</el-tag>
-                  </div>
-                </template>
-              </el-table-column>
-              <el-table-column prop="sourceCount" label="信源数量" width="90" align="center" sortable>
-                <template #default="{ row }">
-                  <el-button link type="primary" size="small" @click="goClueSources(row)">{{ row.sourceCount }}</el-button>
-                </template>
-              </el-table-column>
-              <el-table-column prop="negativeVolume" label="负面声量" width="100" align="center" sortable />
-              <el-table-column prop="riskLevel" label="风险等级" width="100" align="center">
-                <template #default="{ row }">
-                  <el-tag :type="row.riskLevel === '高' ? 'danger' : row.riskLevel === '中' ? 'warning' : 'info'" effect="plain">
-                    {{ row.riskLevel }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="deepDive" label="是否深钻" width="110" align="center">
-                <template #default="{ row }">
-                  <el-button v-if="row.deepDive" link type="primary" size="small">建议深钻</el-button>
-                  <span v-else class="muted-text">暂不深钻</span>
-                </template>
-              </el-table-column>
-              <el-table-column prop="alert" label="预警建议" width="100" align="center">
-                <template #default="{ row }">
-                  <el-tag :type="row.alert ? 'danger' : 'info'" size="small" effect="plain">{{ row.alert ? '建议预警' : '观察' }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" width="90" align="center" fixed="right">
-                <template #default="{ row }">
-                  <el-button link type="primary" size="small" @click="openClueDetail(row, 'new')">详情</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </el-tab-pane>
-          <el-tab-pane label="AI舆情线索" name="ai">
-            <el-table :data="aiOpinionClueRows" stripe size="small" :header-cell-style="headerCellStyle">
-              <el-table-column prop="clue" label="AI线索名称" min-width="160" show-overflow-tooltip>
-                <template #default="{ row }">
-                  <strong class="clue-title">{{ row.clue }}</strong>
-                </template>
-              </el-table-column>
-              <el-table-column prop="relatedQuestion" label="关联问题" min-width="230" show-overflow-tooltip />
-              <el-table-column prop="quoteCount" label="被引用次数" width="100" align="center" sortable>
-                <template #default="{ row }">
-                  <el-button link type="primary" size="small" @click="goClueSources(row)">{{ row.quoteCount }}</el-button>
-                </template>
-              </el-table-column>
-              <el-table-column prop="modelCount" label="影响模型数" width="100" align="center" sortable />
-              <el-table-column prop="historySourceCount" label="信源数量" width="100" align="center" sortable>
-                <template #default="{ row }">
-                  <el-button link type="primary" size="small" @click="goClueSources(row)">{{ row.historySourceCount }}</el-button>
-                </template>
-              </el-table-column>
-              <el-table-column prop="lastQuotedAt" label="最近引用时间" width="150" />
-              <el-table-column prop="negativeTags" label="负面认知标签" min-width="190">
-                <template #default="{ row }">
-                  <div class="keyword-tags">
-                    <el-tag v-for="tag in row.negativeTags" :key="tag" size="small" type="danger" effect="plain">{{ tag }}</el-tag>
-                  </div>
-                </template>
-              </el-table-column>
-              <el-table-column prop="governanceAdvice" label="治理建议" min-width="240" show-overflow-tooltip />
-              <el-table-column label="操作" width="90" align="center" fixed="right">
-                <template #default="{ row }">
-                  <el-button link type="primary" size="small" @click="openClueDetail(row, 'ai')">详情</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-          </el-tab-pane>
-        </el-tabs>
-      </el-card>
-
-      <div class="overview-section-title">
-        <strong>风险信源监测</strong>
-        <span>查看每天新增风险信源数量，以及当前最活跃的风险来源平台。</span>
+        <el-card shadow="never" class="content-card overview-word-card">
+          <template #header><div class="card-head"><span>负面词云</span><small>高频负面表达</small></div></template>
+          <div class="word-cloud negative-cloud overview-word-cloud">
+            <span
+              v-for="word in overviewNegativeWords"
+              :key="word.text"
+              :class="`size-${word.size}`"
+              :style="{ left: word.left + '%', top: word.top + '%' }"
+            >{{ word.text }}</span>
+          </div>
+        </el-card>
       </div>
-      <el-row :gutter="16" class="mb-16">
-        <el-col :span="16">
-          <el-card shadow="never" class="chart-card">
+
+      <div class="overview-focus-grid mb-16">
+        <section class="overview-main-panel">
+          <el-card shadow="never" class="content-card clue-pool-card focus-card">
             <template #header>
               <div class="card-head">
-                <span>风险信源趋势</span>
-                <small>按天汇总检测到的风险信源数量</small>
+                <div>
+                  <span>舆情线索池</span>
+                  <small>区分新增信源线索和长期影响 AI 认知的线索</small>
+                </div>
+                <button class="view-link" @click="goClueList">查看全部 →</button>
               </div>
             </template>
-            <div class="source-trend-chart">
-              <div class="trend-plot">
-                <svg viewBox="0 0 720 220" preserveAspectRatio="none" aria-hidden="true">
-                  <line v-for="y in [30, 70, 110, 150, 190]" :key="y" x1="30" :y1="y" x2="700" :y2="y" class="grid-line" />
-                  <polyline :points="sourceTrendPolyline" class="source-trend-line" />
-                  <g v-for="point in sourceTrendSvgPoints" :key="point.day">
-                    <rect :x="point.x - 14" :y="point.y" width="28" :height="190 - point.y" rx="4" class="source-trend-bar" />
-                    <circle :cx="point.x" :cy="point.y" r="4" class="source-trend-dot" />
-                    <text :x="point.x" :y="point.y - 10" text-anchor="middle" class="source-trend-label">{{ point.value }}</text>
-                  </g>
-                </svg>
-              </div>
-              <div class="axis-row"><span v-for="point in sourceTrendItems" :key="point.day">{{ point.day }}</span></div>
-            </div>
+            <el-tabs v-model="cluePoolActiveTab" class="clue-tabs compact-tabs">
+              <el-tab-pane label="新增信源线索" name="new">
+                <el-table :data="opinionClueRows.slice(0, 8)" stripe size="small" :header-cell-style="headerCellStyle">
+                  <el-table-column prop="clue" label="舆情线索" min-width="150" show-overflow-tooltip>
+                    <template #default="{ row }">
+                      <strong class="clue-title">{{ row.clue }}</strong>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="models" label="覆盖模型" width="112" align="center">
+                    <template #default="{ row }">
+                      <div class="clue-model-icons">
+                        <span v-for="model in row.models || []" :key="model" class="clue-model-icon" :title="model">{{ modelShortName(model) }}</span>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="relatedContent" label="负面摘要" min-width="240" show-overflow-tooltip />
+                  <el-table-column prop="sourceCount" label="关联信源" width="96" align="center" sortable class-name="nowrap-column" header-class-name="nowrap-column">
+                    <template #default="{ row }">
+                      <el-button link type="primary" size="small" @click="goClueSources(row)">{{ row.sourceCount }}</el-button>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="aiQuoteCount" label="关联问题" width="92" align="center" sortable>
+                    <template #default="{ row }">
+                      <el-button link type="primary" size="small" @click="goClueQuestions(row)">{{ row.aiQuoteCount }}</el-button>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="riskLevel" label="风险" width="70" align="center">
+                    <template #default="{ row }">
+                      <el-tag :type="row.riskLevel === '高' ? 'danger' : row.riskLevel === '中' ? 'warning' : 'info'" effect="plain" size="small">
+                        {{ row.riskLevel }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="deepDive" label="治理建议" width="96" align="center">
+                    <template #default="{ row }">
+                      <el-button v-if="row.deepDive" link type="primary" size="small">专项分析</el-button>
+                      <span v-else class="muted-text">观察</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="66" align="center" fixed="right">
+                    <template #default="{ row }">
+                      <el-button link type="primary" size="small" @click="openClueDetail(row, 'new')">详情</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </el-tab-pane>
+              <el-tab-pane label="AI舆情线索" name="ai">
+                <el-table :data="aiOpinionClueRows.slice(0, 8)" stripe size="small" :header-cell-style="headerCellStyle">
+                  <el-table-column prop="clue" label="AI线索名称" min-width="150" show-overflow-tooltip>
+                    <template #default="{ row }">
+                      <strong class="clue-title">{{ row.clue }}</strong>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="models" label="覆盖模型" width="112" align="center">
+                    <template #default="{ row }">
+                      <div class="clue-model-icons">
+                        <span v-for="model in row.models || []" :key="model" class="clue-model-icon" :title="model">{{ modelShortName(model) }}</span>
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="relatedQuestion" label="关联问题" min-width="210" show-overflow-tooltip />
+                  <el-table-column prop="quoteCount" label="关联问题" width="92" align="center" sortable>
+                    <template #default="{ row }">
+                      <el-button link type="primary" size="small" @click="goClueQuestions(row)">{{ row.quoteCount }}</el-button>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="historySourceCount" label="关联信源" width="96" align="center" sortable class-name="nowrap-column" header-class-name="nowrap-column">
+                    <template #default="{ row }">
+                      <el-button link type="primary" size="small" @click="goClueSources(row)">{{ row.historySourceCount }}</el-button>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="governanceAdvice" label="治理建议" min-width="210" show-overflow-tooltip />
+                  <el-table-column label="操作" width="66" align="center" fixed="right">
+                    <template #default="{ row }">
+                      <el-button link type="primary" size="small" @click="openClueDetail(row, 'ai')">详情</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </el-tab-pane>
+            </el-tabs>
           </el-card>
-        </el-col>
-        <el-col :span="8">
-          <el-card shadow="never" class="chart-card">
+
+        </section>
+
+        <aside class="overview-side-panel">
+          <el-card shadow="never" class="content-card focus-card">
             <template #header>
               <div class="card-head">
-                <span>当日风险信源 TOP10</span>
+                <div class="card-title-stack">
+                  <span>信源平台 TOP10</span>
+                  <small>{{ filterRangeLabelMap[filterState.range] }}内风险信源来源平台统计</small>
+                </div>
                 <button class="view-link" @click="goSourceStats()">查看全部 →</button>
               </div>
             </template>
-            <div class="source-top-list">
+            <div class="source-top-list compact">
               <button v-for="(item, index) in currentDayRiskSourceTop" :key="item.name" type="button" class="source-top-item" @click="goSourceStats(item.name)">
                 <span class="rank-no">{{ index + 1 }}</span>
                 <span class="source-top-name">{{ item.name }}</span>
@@ -240,37 +191,66 @@
               </button>
             </div>
           </el-card>
-        </el-col>
-      </el-row>
-
-      <div class="overview-section-title">
-        <strong>维度分析</strong>
-        <span>按风险维度汇总问题分布，并给出本期处置重点。</span>
+        </aside>
       </div>
-      <el-row :gutter="16">
-        <el-col :span="16">
-          <el-card shadow="never" class="content-card">
-            <template #header><div class="card-head"><span>风险维度分布</span></div></template>
-            <el-table :data="riskDimensionTable" size="small" :header-cell-style="headerCellStyle">
-              <el-table-column prop="dimension" label="风险维度" min-width="140" />
-              <el-table-column prop="questions" label="问题数" width="90" align="center" />
-              <el-table-column prop="negativeRate" label="负面率" width="100" align="center" />
-              <el-table-column prop="sourceCount" label="风险信源" width="100" align="center" />
-              <el-table-column prop="topQuestion" label="最高风险问题" min-width="220" show-overflow-tooltip />
-            </el-table>
-          </el-card>
-        </el-col>
-        <el-col :span="8">
-          <el-card shadow="never" class="content-card">
-            <template #header><div class="card-head"><span>本期智能结论</span></div></template>
-            <ul class="insight-list">
-              <li>换壳争议仍是当前最高风险主题，负面提及率达到 82%。</li>
-              <li>论坛和短视频评论正在影响 AI 对事件的归因判断。</li>
-              <li>建议优先处理高权重信源，并补充官方澄清和技术差异说明。</li>
-            </ul>
-          </el-card>
-        </el-col>
-      </el-row>
+
+      <div class="overview-analysis-grid mb-16">
+        <el-card shadow="never" class="chart-card">
+          <template #header>
+            <div class="card-head">
+              <span>舆情趋势</span>
+              <small>按天汇总新增负面舆情数量</small>
+            </div>
+          </template>
+          <div class="source-trend-chart compact-chart">
+            <div class="trend-plot">
+              <svg viewBox="0 0 720 220" preserveAspectRatio="none" aria-hidden="true">
+                <line v-for="y in [30, 70, 110, 150, 190]" :key="y" x1="30" :y1="y" x2="700" :y2="y" class="grid-line" />
+                <polyline :points="opinionNegativePolyline" class="dual-trend-line danger" />
+                <g v-for="point in opinionNegativePoints" :key="`negative-${point.day}`">
+                  <circle :cx="point.x" :cy="point.y" r="4" class="dual-trend-dot danger" />
+                  <text :x="point.x" :y="point.y - 10" text-anchor="middle" class="dual-trend-label danger">{{ point.value }}</text>
+                </g>
+              </svg>
+            </div>
+            <div class="axis-row"><span v-for="point in opinionTrendItems" :key="point.day">{{ point.day }}</span></div>
+            <div class="trend-legend">
+              <span><i class="danger"></i>新增负面舆情</span>
+            </div>
+          </div>
+        </el-card>
+
+        <el-card shadow="never" class="chart-card">
+          <template #header>
+            <div class="card-head">
+              <span>风险信源趋势</span>
+              <small>按天汇总新增信源和累计风险信源</small>
+            </div>
+          </template>
+          <div class="source-trend-chart compact-chart">
+            <div class="trend-plot">
+              <svg viewBox="0 0 720 220" preserveAspectRatio="none" aria-hidden="true">
+                <line v-for="y in [30, 70, 110, 150, 190]" :key="y" x1="30" :y1="y" x2="700" :y2="y" class="grid-line" />
+                <polyline :points="sourceNewPolyline" class="dual-trend-line blue" />
+                <polyline :points="sourceTotalPolyline" class="dual-trend-line orange" />
+                <g v-for="point in sourceNewPoints" :key="`new-${point.day}`">
+                  <circle :cx="point.x" :cy="point.y" r="4" class="dual-trend-dot blue" />
+                  <text :x="point.x" :y="point.y - 10" text-anchor="middle" class="dual-trend-label blue">{{ point.value }}</text>
+                </g>
+                <g v-for="point in sourceTotalPoints" :key="`total-${point.day}`">
+                  <circle :cx="point.x" :cy="point.y" r="4" class="dual-trend-dot orange" />
+                </g>
+              </svg>
+            </div>
+            <div class="axis-row"><span v-for="point in sourceTrendItems" :key="point.day">{{ point.day }}</span></div>
+            <div class="trend-legend">
+              <span><i class="blue"></i>新增信源</span>
+              <span><i class="orange"></i>全部信源</span>
+            </div>
+          </div>
+        </el-card>
+
+      </div>
 
     </template>
 
@@ -278,9 +258,8 @@
       <div class="real-time-header">
         <div>
           <h2>舆情线索</h2>
-          <p>系统自动聚合新发信源线索与长期影响 AI 认知的舆情线索，辅助判断深钻和预警优先级</p>
+          <p>系统自动聚合新增信源线索与长期影响 AI 认知的舆情线索，辅助判断专项分析和预警优先级</p>
         </div>
-        <el-button plain @click="cluePoolActiveTab = 'new'">查看新发线索</el-button>
       </div>
 
       <div class="clue-filter-card">
@@ -307,30 +286,22 @@
       </div>
 
       <el-card shadow="never" class="content-card clue-pool-card mb-16">
-        <template #header>
-          <div class="card-head">
-            <div class="card-title-stack">
-              <span>线索总览</span>
-              <small>{{ cluePoolActiveTab === 'ai' ? '长期影响模型回答的历史认知线索' : '最近新增内容聚合出的风险线索' }}</small>
-            </div>
-          </div>
-        </template>
-        <div class="clue-summary">
-          <div v-for="item in currentCluePoolCards" :key="item.label" class="clue-summary-item">
-            <span>{{ item.label }}</span>
-            <strong :class="item.type">{{ item.value }}</strong>
-            <p>{{ item.desc }}</p>
-          </div>
-        </div>
         <el-tabs v-model="cluePoolActiveTab" class="clue-tabs">
-          <el-tab-pane label="新发信源线索" name="new">
+          <el-tab-pane label="新增信源线索" name="new">
             <el-table :data="filteredOpinionClueRows" stripe size="small" :header-cell-style="headerCellStyle">
               <el-table-column prop="clue" label="舆情线索" min-width="150" show-overflow-tooltip>
                 <template #default="{ row }">
                   <strong class="clue-title">{{ row.clue }}</strong>
                 </template>
               </el-table-column>
-              <el-table-column prop="relatedContent" label="关联内容" min-width="280" show-overflow-tooltip />
+              <el-table-column prop="models" label="覆盖模型" width="112" align="center">
+                <template #default="{ row }">
+                  <div class="clue-model-icons">
+                    <span v-for="model in row.models || []" :key="model" class="clue-model-icon" :title="model">{{ modelShortName(model) }}</span>
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column prop="relatedContent" label="负面摘要" min-width="280" show-overflow-tooltip />
               <el-table-column prop="platforms" label="关联平台" min-width="180">
                 <template #default="{ row }">
                   <div class="keyword-tags">
@@ -338,12 +309,16 @@
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column prop="sourceCount" label="信源数量" width="90" align="center" sortable>
+              <el-table-column prop="sourceCount" label="关联信源" width="96" align="center" sortable class-name="nowrap-column" header-class-name="nowrap-column">
                 <template #default="{ row }">
                   <el-button link type="primary" size="small" @click="goClueSources(row)">{{ row.sourceCount }}</el-button>
                 </template>
               </el-table-column>
-              <el-table-column prop="negativeVolume" label="负面声量" width="100" align="center" sortable />
+              <el-table-column prop="aiQuoteCount" label="关联问题" width="92" align="center" sortable>
+                <template #default="{ row }">
+                  <el-button link type="primary" size="small" @click="goClueQuestions(row)">{{ row.aiQuoteCount }}</el-button>
+                </template>
+              </el-table-column>
               <el-table-column prop="riskLevel" label="风险等级" width="100" align="center">
                 <template #default="{ row }">
                   <el-tag :type="row.riskLevel === '高' ? 'danger' : row.riskLevel === '中' ? 'warning' : 'info'" effect="plain">
@@ -366,14 +341,20 @@
                   <strong class="clue-title">{{ row.clue }}</strong>
                 </template>
               </el-table-column>
-              <el-table-column prop="relatedQuestion" label="关联问题" min-width="230" show-overflow-tooltip />
-              <el-table-column prop="quoteCount" label="被引用次数" width="100" align="center" sortable>
+              <el-table-column prop="models" label="覆盖模型" width="112" align="center">
                 <template #default="{ row }">
-                  <el-button link type="primary" size="small" @click="goClueSources(row)">{{ row.quoteCount }}</el-button>
+                  <div class="clue-model-icons">
+                    <span v-for="model in row.models || []" :key="model" class="clue-model-icon" :title="model">{{ modelShortName(model) }}</span>
+                  </div>
                 </template>
               </el-table-column>
-              <el-table-column prop="modelCount" label="影响模型数" width="100" align="center" sortable />
-              <el-table-column prop="historySourceCount" label="信源数量" width="100" align="center" sortable>
+              <el-table-column prop="relatedQuestion" label="关联问题" min-width="230" show-overflow-tooltip />
+              <el-table-column prop="quoteCount" label="关联问题" width="92" align="center" sortable>
+                <template #default="{ row }">
+                  <el-button link type="primary" size="small" @click="goClueQuestions(row)">{{ row.quoteCount }}</el-button>
+                </template>
+              </el-table-column>
+              <el-table-column prop="historySourceCount" label="关联信源" width="96" align="center" sortable class-name="nowrap-column" header-class-name="nowrap-column">
                 <template #default="{ row }">
                   <el-button link type="primary" size="small" @click="goClueSources(row)">{{ row.historySourceCount }}</el-button>
                 </template>
@@ -519,7 +500,7 @@
           <div class="card-head">
             <div class="card-title-stack">
               <span>{{ currentClueDetail.clue }}</span>
-              <small>{{ currentClueDetail.type === 'ai' ? 'AI 舆情线索' : '新发信源线索' }}</small>
+              <small>{{ currentClueDetail.type === 'ai' ? 'AI 舆情线索' : '新增信源线索' }}</small>
             </div>
             <el-tag :type="currentClueDetail.riskLevel === '高' ? 'danger' : currentClueDetail.riskLevel === '中' ? 'warning' : 'info'" effect="plain">
               {{ currentClueDetail.riskLevel }}
@@ -566,7 +547,7 @@
             </div>
             <div class="clue-detail-section">
               <span>建议动作</span>
-              <p>{{ currentClueDetail.governanceAdvice || (currentClueDetail.deepDive ? '建议进入专项深钻，并结合高权重信源证据判断是否预警。' : '持续观察信源变化，暂不进入专项深钻。') }}</p>
+              <p>{{ currentClueDetail.governanceAdvice || (currentClueDetail.deepDive ? '建议进入专项分析，并结合高权重信源证据判断是否预警。' : '持续观察信源变化，暂不进入专项分析。') }}</p>
             </div>
             <el-button type="primary" plain size="small" @click="goClueSources(currentClueDetail)">查看对应信源</el-button>
           </el-card>
@@ -691,7 +672,8 @@
           </div>
         </template>
         <el-table :data="filteredQuestionList" stripe size="small" :header-cell-style="headerCellStyle">
-          <el-table-column prop="question" label="监控问题" min-width="260" show-overflow-tooltip />
+          <el-table-column prop="question" label="监控问题" min-width="240" show-overflow-tooltip />
+          <el-table-column prop="negativeSummary" label="负面摘要" min-width="260" show-overflow-tooltip />
           <el-table-column prop="category" label="问题方向" width="120" />
           <el-table-column prop="riskLevel" label="风险等级" width="90" align="center">
             <template #default="{ row }">
@@ -935,67 +917,276 @@
 
     <template v-else-if="section === 'tasks'">
       <div class="page-toolbar">
-        <div>
+        <div class="toolbar-title">
           <h2>监控任务</h2>
-          <p>持续展示舆情采集计划、执行记录、异常模型和报告生成情况。</p>
+          <p>当前舆情项目的执行记录、风险采集结果、未来排期和监控报告。</p>
         </div>
         <div class="toolbar-actions">
-          <el-button plain>刷新</el-button>
-          <el-button type="primary">立即执行</el-button>
+          <el-input v-model="taskKeyword" clearable placeholder="搜索任务名称 / 任务ID" :prefix-icon="Search" class="search-input" />
+          <el-button plain @click="refreshSentimentTasks"><el-icon><Refresh /></el-icon>刷新</el-button>
+          <el-button type="primary" @click="runSentimentTask">立即执行</el-button>
         </div>
       </div>
-      <el-card shadow="never" class="content-card mb-16">
-        <template #header>计划执行</template>
+
+      <el-card shadow="never" class="plan-card mb-16">
+        <template #header>
+          <div class="section-header">
+            <div>
+              <span class="section-title">计划执行</span>
+              <span class="section-subtitle">展示未来几条定时监控计划，便于确认后续任务是否已排期。</span>
+            </div>
+            <el-tag type="info" effect="plain">未来 {{ futurePlans.length }} 条</el-tag>
+          </div>
+        </template>
         <div class="plan-list">
           <div v-for="plan in futurePlans" :key="plan.id" class="plan-item">
-            <div>
-              <strong>{{ plan.name }}</strong>
-              <p>{{ plan.nextTime }} · {{ plan.questionCount }} 个问题 · {{ plan.models }}</p>
+            <div class="plan-content">
+              <div class="plan-title">{{ plan.name }}</div>
+              <div class="plan-meta">
+                <span>{{ plan.nextTime }}</span>
+                <span>{{ plan.questionCount }} 个问题</span>
+                <span>{{ plan.models }}</span>
+              </div>
             </div>
             <el-tag type="primary" effect="plain">{{ plan.cycle }}</el-tag>
           </div>
         </div>
       </el-card>
-      <el-card shadow="never" class="content-card">
-        <template #header>任务记录</template>
-        <el-table :data="monitorTasks" stripe :header-cell-style="headerCellStyle">
-          <el-table-column prop="id" label="任务ID" width="120" />
-          <el-table-column prop="questionCount" label="问题数" width="90" align="center" />
-          <el-table-column prop="models" label="模型覆盖" width="120" align="center" />
-          <el-table-column prop="negativeRate" label="负面率" width="100" align="center" />
-          <el-table-column prop="riskSources" label="风险信源" width="100" align="center" />
-          <el-table-column prop="status" label="状态" width="100" align="center" />
-          <el-table-column prop="startTime" label="开始时间" width="160" />
-          <el-table-column prop="result" label="结果" min-width="220" />
-        </el-table>
-      </el-card>
-    </template>
 
-    <template v-else-if="section === 'reports'">
-      <el-card shadow="never" class="content-card">
-        <template #header>
-          <div class="card-head">
-            <span>舆情报告</span>
-            <el-tabs v-model="reportType" class="mini-tabs">
-              <el-tab-pane label="日报" name="daily" />
-              <el-tab-pane label="周报" name="weekly" />
-              <el-tab-pane label="专项报告" name="special" />
-            </el-tabs>
+      <el-card shadow="never" class="task-card mb-16">
+        <div class="task-card-header">
+          <el-radio-group v-model="taskStatus" size="small">
+            <el-radio-button label="all">全部</el-radio-button>
+            <el-radio-button label="running">执行中</el-radio-button>
+            <el-radio-button label="done">已完成</el-radio-button>
+            <el-radio-button label="failed">失败</el-radio-button>
+          </el-radio-group>
+          <div class="table-extra">
+            <el-date-picker
+              v-model="taskDateRange"
+              type="daterange"
+              range-separator="至"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+              size="small"
+              value-format="YYYY-MM-DD"
+              style="width: 240px"
+            />
+            <el-select v-model="taskTrigger" size="small" style="width: 128px">
+              <el-option label="全部触发方式" value="all" />
+              <el-option label="手动执行" value="manual" />
+              <el-option label="定时任务" value="schedule" />
+              <el-option label="复测任务" value="retest" />
+            </el-select>
+            <el-button type="primary" size="small" @click="taskReportVisible = true">生成报告</el-button>
           </div>
-        </template>
-        <el-table :data="reports" stripe :header-cell-style="headerCellStyle">
-          <el-table-column prop="name" label="报告名称" min-width="240" />
-          <el-table-column prop="period" label="周期" width="180" />
-          <el-table-column prop="risk" label="风险等级" width="120" align="center" />
-          <el-table-column prop="negativeRate" label="负面率" width="100" align="center" />
-          <el-table-column prop="summary" label="报告结论" min-width="220" />
-          <el-table-column label="操作" width="160" align="center">
-            <template #default>
-              <el-button type="primary" size="small" plain @click="openReport">查看报告</el-button>
+        </div>
+
+        <el-table :data="filteredMonitorTasks" stripe class="task-table" :header-cell-style="headerCellStyle">
+          <el-table-column prop="id" label="任务ID" width="118" show-overflow-tooltip />
+          <el-table-column prop="questionCount" label="问题数" width="76" align="center" />
+          <el-table-column label="覆盖模型" width="112" align="center">
+            <template #default="{ row }">
+              <div class="clue-model-icons">
+                <span v-for="model in row.modelList" :key="model" class="clue-model-icon" :title="model">{{ modelShortName(model) }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="riskSources" label="风险信源" width="104" align="center" sortable class-name="nowrap-column" header-class-name="nowrap-column" />
+          <el-table-column prop="triggerText" label="触发方式" width="92" />
+          <el-table-column label="状态" width="88" align="center">
+            <template #default="{ row }">
+              <el-tag :type="sentimentTaskStatusMeta[row.status].type" effect="plain" size="small">{{ sentimentTaskStatusMeta[row.status].text }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="startTime" label="开始时间" width="150" />
+          <el-table-column prop="endTime" label="完成时间" width="150">
+            <template #default="{ row }">{{ row.endTime || '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="result" label="结果" min-width="220" show-overflow-tooltip />
+          <el-table-column label="操作" width="156" align="center" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="openTaskDetail(row)">详情</el-button>
+              <el-button link type="primary" @click="exportTaskData(row)">导出数据</el-button>
             </template>
           </el-table-column>
         </el-table>
       </el-card>
+
+      <el-card shadow="never" class="report-card">
+        <template #header>
+          <div class="section-header">
+            <div>
+              <span class="section-title">监控报告</span>
+              <span class="section-subtitle">报告保存 30 天，生成后请尽快下载。</span>
+            </div>
+            <el-select v-model="taskReportTypeFilter" size="small" style="width: 140px">
+              <el-option label="全部报告类型" value="all" />
+              <el-option label="日报" value="daily" />
+              <el-option label="周报" value="weekly" />
+              <el-option label="月报" value="monthly" />
+              <el-option label="自定义时间段" value="custom" />
+            </el-select>
+          </div>
+        </template>
+        <el-table :data="filteredTaskReports" stripe class="report-table" :header-cell-style="headerCellStyle">
+          <el-table-column prop="name" label="报告名称" min-width="280" show-overflow-tooltip />
+          <el-table-column label="报告类型" width="112" align="center">
+            <template #default="{ row }"><el-tag effect="plain" size="small">{{ taskReportTypeText[row.type] }}</el-tag></template>
+          </el-table-column>
+          <el-table-column prop="period" label="周期" min-width="170" show-overflow-tooltip />
+          <el-table-column prop="riskSources" label="风险信源" width="104" align="center" class-name="nowrap-column" header-class-name="nowrap-column" />
+          <el-table-column prop="summary" label="报告结论" min-width="220" show-overflow-tooltip />
+          <el-table-column label="状态" width="92" align="center">
+            <template #default="{ row }">
+              <el-tag :type="taskReportStatusMeta[row.status].type" effect="plain" size="small">{{ taskReportStatusMeta[row.status].text }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="createdAt" label="创建时间" width="150" />
+          <el-table-column prop="completedAt" label="完成时间" width="150">
+            <template #default="{ row }">{{ row.completedAt || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="108" align="center" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="viewTaskReport(row)">查看</el-button>
+              <el-button link type="primary" :disabled="row.status !== 'done'" @click="downloadTaskReport(row)">下载</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+
+      <el-dialog v-model="taskReportVisible" width="640px" class="manual-report-dialog">
+        <template #header>
+          <div class="manual-report-title-row">
+            <span>生成报告</span>
+            <em>报告保存 30 天，生成后请尽快下载</em>
+          </div>
+        </template>
+        <el-form label-position="top" class="manual-report-form">
+          <el-form-item class="manual-report-section no-label">
+            <div class="report-type-grid">
+              <button
+                v-for="item in taskReportTypeOptions"
+                :key="item.value"
+                type="button"
+                class="report-type-card"
+                :class="{ active: taskReportForm.type === item.value }"
+                @click="taskReportForm.type = item.value"
+              >
+                <strong>{{ item.label }}</strong>
+                <span>{{ item.desc }}</span>
+              </button>
+            </div>
+          </el-form-item>
+          <el-form-item label="统计时间" class="manual-report-section">
+            <div class="manual-time-box">
+              <el-date-picker
+                v-if="taskReportForm.type === 'daily'"
+                v-model="taskReportForm.day"
+                type="date"
+                value-format="YYYY-MM-DD"
+                placeholder="选择哪一天"
+                style="width: 240px"
+              />
+              <div v-else-if="taskReportForm.type === 'weekly'" class="time-picker-row">
+                <el-date-picker v-model="taskReportForm.weekDate" type="week" format="YYYY 第 ww 周" value-format="YYYY-MM-DD" placeholder="选择哪一周" style="width: 240px" />
+                <span class="week-range-preview">周一至周日，当前周截至今天</span>
+              </div>
+              <div v-else-if="taskReportForm.type === 'monthly'" class="time-picker-row">
+                <el-date-picker v-model="taskReportForm.month" type="month" value-format="YYYY-MM" placeholder="选择哪一月" style="width: 240px" />
+                <span class="week-range-preview">自然月统计，当前月截至今天</span>
+              </div>
+              <el-date-picker
+                v-else
+                v-model="taskReportForm.customRange"
+                type="daterange"
+                range-separator="至"
+                start-placeholder="开始日期"
+                end-placeholder="结束日期"
+                value-format="YYYY-MM-DD"
+                style="width: 320px"
+              />
+            </div>
+          </el-form-item>
+          <div class="manual-report-tip">将按当前选择的时间范围汇总舆情任务结果，完成后可在监控报告或导出中心下载。</div>
+        </el-form>
+        <template #footer>
+          <div class="manual-report-footer">
+            <span class="report-cost-tip">生成一份报告将消耗: ¥5.00</span>
+            <div class="manual-report-actions">
+              <el-button @click="taskReportVisible = false">取消</el-button>
+              <el-button type="primary" @click="createTaskReport">确认生成</el-button>
+            </div>
+          </div>
+        </template>
+      </el-dialog>
+    </template>
+
+    <template v-else-if="section === 'reports'">
+      <div class="export-center-page">
+        <div class="page-toolbar">
+          <div class="toolbar-title">
+            <h2>导出中心</h2>
+            <p>查看舆情报告、任务数据和信源明细的后台生成进度，完成后可下载到本地。</p>
+          </div>
+          <div class="toolbar-actions">
+            <el-input v-model="exportKeyword" clearable placeholder="搜索报告名称 / 导出内容" :prefix-icon="Search" class="search-input" />
+            <el-button plain @click="refreshExportJobs"><el-icon><Refresh /></el-icon>刷新</el-button>
+          </div>
+        </div>
+
+        <div class="summary-row">
+          <div v-for="item in exportSummaryCards" :key="item.label" class="summary-card">
+            <span>{{ item.label }}</span>
+            <strong>{{ item.value }}</strong>
+          </div>
+        </div>
+
+        <el-card shadow="never" class="export-card">
+          <div class="table-toolbar">
+            <el-radio-group v-model="exportStatus" size="small">
+              <el-radio-button label="all">全部</el-radio-button>
+              <el-radio-button label="pending">排队中</el-radio-button>
+              <el-radio-button label="processing">生成中</el-radio-button>
+              <el-radio-button label="success">已完成</el-radio-button>
+              <el-radio-button label="failed">失败</el-radio-button>
+            </el-radio-group>
+            <el-select v-model="exportType" size="small" style="width: 132px">
+              <el-option label="全部类型" value="all" />
+              <el-option label="日报" value="daily" />
+              <el-option label="周报" value="weekly" />
+              <el-option label="舆情报告" value="sentiment-report" />
+              <el-option label="信源明细" value="source-data" />
+              <el-option label="问题明细" value="question-data" />
+            </el-select>
+          </div>
+
+          <el-table :data="filteredExportJobs" stripe class="export-table" :header-cell-style="headerCellStyle">
+            <el-table-column prop="project" label="所属项目" min-width="180" show-overflow-tooltip />
+            <el-table-column prop="source" label="任务来源" width="110" />
+            <el-table-column prop="reportName" label="报告名称" min-width="260" show-overflow-tooltip />
+            <el-table-column prop="name" label="导出内容" min-width="130" show-overflow-tooltip />
+            <el-table-column prop="range" label="时间范围" min-width="170" show-overflow-tooltip />
+            <el-table-column prop="fileSize" label="文件大小" width="96" align="center" />
+            <el-table-column prop="createdAt" label="创建时间" width="150" />
+            <el-table-column prop="finishedAt" label="完成时间" width="150">
+              <template #default="{ row }">{{ row.finishedAt || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="96" align="center">
+              <template #default="{ row }">
+                <el-tag :type="exportStatusMeta[row.status].type" effect="plain" size="small">{{ exportStatusMeta[row.status].text }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="140" align="center" fixed="right">
+              <template #default="{ row }">
+                <el-button v-if="row.status === 'success'" link type="primary" @click="downloadExportJob(row)">下载</el-button>
+                <el-button v-else-if="row.status === 'failed'" link type="primary" @click="retryExportJob(row)">重试</el-button>
+                <span v-else class="muted-text">等待生成</span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </div>
     </template>
 
     <template v-else-if="section === 'config' && configPage === 'subject'">
@@ -1804,7 +1995,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { QuestionFilled, Search, UploadFilled } from '@element-plus/icons-vue'
+import { QuestionFilled, Refresh, Search, UploadFilled } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -1830,7 +2021,22 @@ const conversationModelFilter = ref('')
 const conversationQuestionFilter = ref('')
 const conversationDetailVisible = ref(false)
 const currentConversationRecord = ref(null)
-const reportType = ref('daily')
+const taskKeyword = ref('')
+const taskStatus = ref('all')
+const taskTrigger = ref('all')
+const taskDateRange = ref([])
+const taskReportTypeFilter = ref('all')
+const taskReportVisible = ref(false)
+const taskReportForm = reactive({
+  type: 'daily',
+  day: '2026-05-29',
+  weekDate: '2026-05-25',
+  month: '2026-05',
+  customRange: ['2026-05-23', '2026-05-29']
+})
+const exportKeyword = ref('')
+const exportStatus = ref('all')
+const exportType = ref('all')
 const keyword = ref('')
 const subjectEditing = ref(false)
 const subjectDialogVisible = ref(false)
@@ -1860,8 +2066,7 @@ const highWeightSourceForm = reactive({ name: '', level: '高', match: '', match
 
 const filterState = reactive({
   model: 'all',
-  range: '7d',
-  risk: 'all'
+  range: '7d'
 })
 
 const currentProject = reactive({
@@ -1915,50 +2120,139 @@ watch(configPage, (page) => {
 
 const headerCellStyle = { background: '#f8fafc', color: '#64748b', fontWeight: 700 }
 
-const overviewCards = [
-  { label: '风险等级', value: '极度高危', desc: '高传播风险，需要优先处置', type: 'danger' },
-  { label: '负面提及率', value: '68%', desc: '较上期上升 12%', type: 'danger' },
-  { label: '风险信源', value: '18', desc: '6 个高权重来源', type: 'warning' },
-  { label: '舆情问题', value: '36', desc: '覆盖 6 类风险场景', type: 'primary' }
+const filterModelLabelMap = {
+  all: '所有模型',
+  deepseek: 'DeepSeek',
+  doubao: '豆包',
+  qwen: '通义千问'
+}
+
+const filterRangeLabelMap = {
+  '7d': '最近7天',
+  '30d': '最近30天',
+  custom: '自定义时间段'
+}
+
+const filterRangeTextMap = {
+  '7d': '最近7天：2026-05-23 ~ 2026-05-29',
+  '30d': '最近30天：2026-04-30 ~ 2026-05-29',
+  custom: '自定义时间段：请选择起止时间'
+}
+
+const selectedRangeText = computed(() => filterRangeTextMap[filterState.range] || filterRangeTextMap['7d'])
+
+const filterRangeDaysMap = {
+  '7d': 7,
+  '30d': 30,
+  custom: 14
+}
+
+const monitoredQuestionCount = 36
+const dailyModelRunCount = 1
+const selectedModelCount = computed(() => filterState.model === 'all' ? 6 : 1)
+const selectedRangeDays = computed(() => filterRangeDaysMap[filterState.range] || 7)
+
+const filteredSummary = computed(() => {
+  const rangeMultiplier = filterState.range === '30d' ? 3.6 : filterState.range === 'custom' ? 1.4 : 1
+  const modelMultiplier = filterState.model === 'all' ? 1 : 0.38
+  const scale = rangeMultiplier * modelMultiplier
+
+  return {
+    negativeSources: Math.max(3, Math.round(68 * scale)),
+    totalQuotedSources: Math.max(8, Math.round(186 * scale)),
+    clues: Math.max(1, Math.round(5 * scale)),
+    issues: Math.max(2, Math.round(36 * scale)),
+    modelVisits: monitoredQuestionCount * selectedRangeDays.value * selectedModelCount.value * dailyModelRunCount
+  }
+})
+
+const overviewCards = computed(() => [
+  {
+    label: '新增负面信源',
+    value: filteredSummary.value.negativeSources,
+    secondary: {
+      label: '总引用信源数',
+      value: filteredSummary.value.totalQuotedSources
+    },
+    desc: '',
+    type: 'danger',
+    tags: [
+      { label: '汽车之家', level: 'high' },
+      { label: '懂车帝', level: 'high' },
+      { label: '小红书', level: 'medium' },
+      { label: '知乎', level: 'medium' }
+    ]
+  },
+  {
+    label: '舆情线索',
+    value: filteredSummary.value.clues,
+    desc: '系统聚合出的重点风险问题',
+    type: 'primary',
+    tags: ['换壳争议', '质量质疑', '价格争议']
+  },
+  {
+    label: '舆情问题',
+    value: filteredSummary.value.issues,
+    desc: '当前筛选条件下命中的监控问题',
+    type: 'primary',
+    tags: ['事件核查', '购买影响', '处置建议']
+  },
+  {
+    label: '大模型访问次数',
+    value: filteredSummary.value.modelVisits.toLocaleString(),
+    desc: `${monitoredQuestionCount}个问题 × ${selectedRangeDays.value}天 × ${selectedModelCount.value}个模型 × 每天${dailyModelRunCount}遍`,
+    type: 'primary',
+    tags: ['问题数', '模型数', '执行频次']
+  }
+])
+
+const opinionTrendItems = [
+  { day: '05-23', negative: 2 },
+  { day: '05-24', negative: 3 },
+  { day: '05-25', negative: 5 },
+  { day: '05-26', negative: 4 },
+  { day: '05-27', negative: 7 },
+  { day: '05-28', negative: 9 },
+  { day: '05-29', negative: 8 }
 ]
-
-const trendItems = [
-  { day: '05-23', value: 48 },
-  { day: '05-24', value: 52 },
-  { day: '05-25', value: 61 },
-  { day: '05-26', value: 58 },
-  { day: '05-27', value: 67 },
-  { day: '05-28', value: 72 },
-  { day: '05-29', value: 68 }
-]
-
-const trendSvgPoints = computed(() => trendItems.map((item, index) => {
-  const x = 40 + index * 108
-  const y = 202 - item.value * 2.2
-  return { ...item, x, y }
-}))
-
-const trendPolyline = computed(() => trendSvgPoints.value.map(item => `${item.x},${item.y}`).join(' '))
 
 const sourceTrendItems = [
-  { day: '05-23', value: 8 },
-  { day: '05-24', value: 10 },
-  { day: '05-25', value: 13 },
-  { day: '05-26', value: 12 },
-  { day: '05-27', value: 16 },
-  { day: '05-28', value: 21 },
-  { day: '05-29', value: 18 }
+  { day: '05-23', newValue: 8, totalValue: 42 },
+  { day: '05-24', newValue: 10, totalValue: 52 },
+  { day: '05-25', newValue: 13, totalValue: 65 },
+  { day: '05-26', newValue: 12, totalValue: 77 },
+  { day: '05-27', newValue: 16, totalValue: 93 },
+  { day: '05-28', newValue: 21, totalValue: 114 },
+  { day: '05-29', newValue: 18, totalValue: 132 }
 ]
 
-const sourceTrendMax = computed(() => Math.max(...sourceTrendItems.map(item => item.value), 1))
-
-const sourceTrendSvgPoints = computed(() => sourceTrendItems.map((item, index) => {
+const buildTrendPoints = (items, key, max) => items.map((item, index) => {
   const x = 40 + index * 108
-  const y = 190 - (item.value / sourceTrendMax.value) * 150
-  return { ...item, x, y }
-}))
+  const value = item[key]
+  const y = 190 - (value / max) * 150
+  return { day: item.day, value, x, y }
+})
 
-const sourceTrendPolyline = computed(() => sourceTrendSvgPoints.value.map(item => `${item.x},${item.y}`).join(' '))
+const pointsToPolyline = (points) => points.map(item => `${item.x},${item.y}`).join(' ')
+
+const modelShortName = (model) => ({
+  DeepSeek: 'D',
+  豆包: '豆',
+  Kimi: 'K',
+  通义千问: '通',
+  文心一言: '文',
+  腾讯元宝: '元'
+}[model] || model.slice(0, 1))
+
+const opinionTrendMax = computed(() => Math.max(...opinionTrendItems.map(item => item.negative), 1))
+const opinionNegativePoints = computed(() => buildTrendPoints(opinionTrendItems, 'negative', opinionTrendMax.value))
+const opinionNegativePolyline = computed(() => pointsToPolyline(opinionNegativePoints.value))
+
+const sourceTrendMax = computed(() => Math.max(...sourceTrendItems.flatMap(item => [item.newValue, item.totalValue]), 1))
+const sourceNewPoints = computed(() => buildTrendPoints(sourceTrendItems, 'newValue', sourceTrendMax.value))
+const sourceTotalPoints = computed(() => buildTrendPoints(sourceTrendItems, 'totalValue', sourceTrendMax.value))
+const sourceNewPolyline = computed(() => pointsToPolyline(sourceNewPoints.value))
+const sourceTotalPolyline = computed(() => pointsToPolyline(sourceTotalPoints.value))
 
 const currentDayRiskSourceTop = [
   { name: '汽车之家', count: 5 },
@@ -2076,22 +2370,6 @@ const spreadPathItems = [
   { stage: '大模型收录反馈', time: '今天 08:00', type: 'model', content: 'DeepSeek / 通义千问语料更新，对用户明确输出“两车是换壳”的错误结论' }
 ]
 
-const cluePoolCards = [
-  { label: '聚合线索', value: '5', desc: '本期最需要关注的问题', type: 'primary' },
-  { label: '高风险线索', value: '3', desc: '需要优先处置或预警', type: 'danger' },
-  { label: '信源总数', value: '68', desc: '跨平台内容与引用信源', type: 'warning' },
-  { label: '建议深钻', value: '3', desc: '建议进入专项深钻分析', type: 'primary' }
-]
-
-const aiCluePoolCards = [
-  { label: 'AI线索', value: '5', desc: '长期影响模型回答的问题', type: 'primary' },
-  { label: '累计引用', value: '186', desc: '历史信源被模型引用次数', type: 'danger' },
-  { label: '影响模型', value: '6', desc: '覆盖 DeepSeek、豆包、Kimi 等', type: 'warning' },
-  { label: '需治理', value: '4', desc: '需要补充正向证据或澄清', type: 'primary' }
-]
-
-const currentCluePoolCards = computed(() => cluePoolActiveTab.value === 'ai' ? aiCluePoolCards : cluePoolCards)
-
 const opinionClueRows = [
   {
     clue: '售后退款难',
@@ -2101,6 +2379,7 @@ const opinionClueRows = [
     highWeightSourceCount: 5,
     aiQuoteCount: 22,
     modelCount: 4,
+    models: ['豆包', 'Kimi', '通义千问', '文心一言'],
     sourceCount: 18,
     negativeVolume: 126,
     recentActiveAt: '2026-05-29 18:20',
@@ -2116,6 +2395,7 @@ const opinionClueRows = [
     highWeightSourceCount: 6,
     aiQuoteCount: 18,
     modelCount: 5,
+    models: ['DeepSeek', '豆包', 'Kimi', '通义千问', '文心一言'],
     sourceCount: 16,
     negativeVolume: 98,
     recentActiveAt: '2026-05-29 17:42',
@@ -2131,6 +2411,7 @@ const opinionClueRows = [
     highWeightSourceCount: 3,
     aiQuoteCount: 14,
     modelCount: 4,
+    models: ['DeepSeek', '豆包', 'Kimi', '通义千问'],
     sourceCount: 14,
     negativeVolume: 82,
     recentActiveAt: '2026-05-29 16:55',
@@ -2146,6 +2427,7 @@ const opinionClueRows = [
     highWeightSourceCount: 4,
     aiQuoteCount: 16,
     modelCount: 5,
+    models: ['DeepSeek', '豆包', 'Kimi', '通义千问', '文心一言'],
     sourceCount: 12,
     negativeVolume: 74,
     recentActiveAt: '2026-05-29 15:38',
@@ -2161,12 +2443,61 @@ const opinionClueRows = [
     highWeightSourceCount: 4,
     aiQuoteCount: 38,
     modelCount: 6,
+    models: ['DeepSeek', '豆包', 'Kimi', '通义千问', '文心一言', '腾讯元宝'],
     sourceCount: 8,
     negativeVolume: 46,
     recentActiveAt: '2026-05-29 09:38',
     riskLevel: '高',
     deepDive: true,
     alert: true
+  },
+  {
+    clue: '配置缩水质疑',
+    relatedContent: '用户围绕入门版配置、选装价格和竞品标配功能展开讨论，质疑豪华品牌配置诚意。',
+    platforms: ['懂车帝', '汽车之家', '小红书'],
+    newSourceCount: 7,
+    highWeightSourceCount: 3,
+    aiQuoteCount: 11,
+    modelCount: 4,
+    models: ['DeepSeek', '豆包', '通义千问', '腾讯元宝'],
+    sourceCount: 7,
+    negativeVolume: 42,
+    recentActiveAt: '2026-05-28 20:10',
+    riskLevel: '中',
+    deepDive: false,
+    alert: false
+  },
+  {
+    clue: '交付体验担忧',
+    relatedContent: '准车主对交付周期、权益兑现和售后承接能力存在疑问，社群内出现观望情绪。',
+    platforms: ['微博', '汽车论坛', '知乎'],
+    newSourceCount: 6,
+    highWeightSourceCount: 2,
+    aiQuoteCount: 9,
+    modelCount: 3,
+    models: ['豆包', 'Kimi', '文心一言'],
+    sourceCount: 6,
+    negativeVolume: 35,
+    recentActiveAt: '2026-05-28 18:46',
+    riskLevel: '中',
+    deepDive: false,
+    alert: false
+  },
+  {
+    clue: '官方解释不足',
+    relatedContent: '多平台评论要求品牌解释平台共用、调校差异和价格差异，认为现有官方口径不够清晰。',
+    platforms: ['腾讯汽车', '网易汽车', '今日头条'],
+    newSourceCount: 5,
+    highWeightSourceCount: 3,
+    aiQuoteCount: 13,
+    modelCount: 4,
+    models: ['DeepSeek', 'Kimi', '豆包', '文心一言'],
+    sourceCount: 5,
+    negativeVolume: 31,
+    recentActiveAt: '2026-05-28 16:30',
+    riskLevel: '中',
+    deepDive: true,
+    alert: false
   }
 ]
 
@@ -2265,6 +2596,63 @@ const aiOpinionClueRows = [
     lastQuotedAt: '2026-05-29 09:35',
     negativeTags: ['转型压力', '信任挑战', '说明不足'],
     governanceAdvice: '持续发布技术路线、研发投入和真实用户体验内容。'
+  },
+  {
+    clue: '配置价值解释不足',
+    relatedQuestion: '奥迪E7X的配置和价格是否匹配？',
+    relatedContent: '模型引用用户配置对比内容后，倾向归纳为配置诚意不足和选装压力较高。',
+    platforms: ['懂车帝', '汽车之家', '小红书'],
+    models: ['DeepSeek', '豆包', '通义千问'],
+    newSourceCount: 2,
+    highWeightSourceCount: 2,
+    quoteCount: 24,
+    modelCount: 3,
+    historySourceCount: 6,
+    sourceCount: 6,
+    negativeVolume: 52,
+    recentActiveAt: '2026-05-28 20:10',
+    riskLevel: '中',
+    lastQuotedAt: '2026-05-28 20:10',
+    negativeTags: ['配置缩水', '选装压力', '价格不匹配'],
+    governanceAdvice: '补充核心配置价值、权益包说明和竞品配置差异表。'
+  },
+  {
+    clue: '准车主观望情绪',
+    relatedQuestion: '奥迪E7X现在适不适合下订？',
+    relatedContent: 'AI 回答会引用社群观望和交付担忧内容，建议用户等待更多车主反馈。',
+    platforms: ['汽车论坛', '微博', '知乎'],
+    models: ['Kimi', '文心一言', '通义千问'],
+    newSourceCount: 2,
+    highWeightSourceCount: 1,
+    quoteCount: 21,
+    modelCount: 3,
+    historySourceCount: 5,
+    sourceCount: 5,
+    negativeVolume: 44,
+    recentActiveAt: '2026-05-28 18:46',
+    riskLevel: '中',
+    lastQuotedAt: '2026-05-28 18:46',
+    negativeTags: ['观望', '交付担忧', '等待反馈'],
+    governanceAdvice: '提供交付节奏、权益兑现和试驾口碑内容，降低用户等待心理。'
+  },
+  {
+    clue: '官方口径缺口',
+    relatedQuestion: '奥迪E7X和智己LS7的技术差异有哪些？',
+    relatedContent: '模型在回答技术差异时证据不足，容易继续引用用户侧“官方没说清”的判断。',
+    platforms: ['腾讯汽车', '网易汽车', '今日头条'],
+    models: ['DeepSeek', 'Kimi', '豆包', '文心一言'],
+    newSourceCount: 3,
+    highWeightSourceCount: 3,
+    quoteCount: 26,
+    modelCount: 4,
+    historySourceCount: 6,
+    sourceCount: 6,
+    negativeVolume: 49,
+    recentActiveAt: '2026-05-28 16:30',
+    riskLevel: '中',
+    lastQuotedAt: '2026-05-28 16:30',
+    negativeTags: ['口径缺口', '差异不清', '证据不足'],
+    governanceAdvice: '发布可被引用的技术差异 FAQ，补齐平台、调校、供应链和服务差异证据。'
   }
 ]
 
@@ -2356,6 +2744,17 @@ const goClueSources = (row) => {
   })
 }
 
+const goClueQuestions = (row) => {
+  router.push({
+    path: `/sentiment-project/${route.params.id}/question-list`,
+    query: { clue: row.clue, question: row.relatedQuestion || '' }
+  })
+}
+
+const goClueList = () => {
+  router.push(`/sentiment-project/${route.params.id}/clues`)
+}
+
 const openClueDetail = (row, type = 'new') => {
   router.push({
     path: `/sentiment-project/${route.params.id}/clue-detail`,
@@ -2381,7 +2780,7 @@ const currentCluePlatforms = computed(() => {
 const clueSeverityCards = computed(() => [
   { label: '新增信源数', value: currentClueDetail.value.newSourceCount || 0, desc: '最近周期新增内容数量', type: 'primary' },
   { label: '高权重信源数', value: currentClueDetail.value.highWeightSourceCount || 0, desc: 'S/A 级信源或重点平台数量', type: 'danger' },
-  { label: '被 AI 引用次数', value: currentClueDetail.value.quoteCount || currentClueDetail.value.aiQuoteCount || 0, desc: '模型回答引用该线索相关信源次数', type: 'warning' },
+  { label: '关联问题', value: currentClueDetail.value.quoteCount || currentClueDetail.value.aiQuoteCount || 0, desc: '当前时间段内命中该线索的大模型问题数', type: 'warning' },
   { label: '影响模型数', value: currentClueDetail.value.modelCount || 0, desc: '受该线索影响的大模型数量', type: 'primary' },
   { label: '负面声量', value: currentClueDetail.value.negativeVolume || 0, desc: '负面内容和负面表达聚合量', type: 'danger' },
   { label: '最近活跃时间', value: currentClueDetail.value.recentActiveAt || currentClueDetail.value.lastQuotedAt || '-', desc: '最近一次发布或引用时间', type: 'primary' }
@@ -2390,7 +2789,7 @@ const clueSeverityCards = computed(() => [
 const clueSeverityRows = computed(() => [
   { label: '新增信源数', value: currentClueDetail.value.newSourceCount || 0, desc: '用于判断线索是否正在发酵，新增越多优先级越高。' },
   { label: '高权重信源数', value: currentClueDetail.value.highWeightSourceCount || 0, desc: '用于判断传播影响力，汽车垂媒、投诉平台、新闻媒体权重更高。' },
-  { label: '被 AI 引用次数', value: currentClueDetail.value.quoteCount || currentClueDetail.value.aiQuoteCount || 0, desc: '用于判断该线索是否已经影响大模型回答。' },
+  { label: '关联问题', value: currentClueDetail.value.quoteCount || currentClueDetail.value.aiQuoteCount || 0, desc: '用于判断该线索是否已经影响大模型问题回答。' },
   { label: '影响模型数', value: currentClueDetail.value.modelCount || 0, desc: '用于判断风险是否跨模型扩散。' },
   { label: '负面声量', value: currentClueDetail.value.negativeVolume || 0, desc: '用于判断用户讨论和负面表达规模。' },
   { label: '最近活跃时间', value: currentClueDetail.value.recentActiveAt || currentClueDetail.value.lastQuotedAt || '-', desc: '用于判断该线索是否仍在活跃。' }
@@ -2712,16 +3111,16 @@ const filteredSourceList = computed(() => {
 })
 
 const questionListRows = [
-  { id: 'Q001', question: '奥迪E7X与智己LS7换壳争议是否属实？', category: '事件核查', riskLevel: '高', status: '运行中', models: '6/6', askCount: 126, negativeRate: 82, sourceCount: 9, lastRunAt: '2026-05-29 09:30', owner: 'momo' },
-  { id: 'Q002', question: '奥迪E7X最近有什么负面新闻？', category: '负面舆情', riskLevel: '高', status: '运行中', models: '6/6', askCount: 98, negativeRate: 76, sourceCount: 7, lastRunAt: '2026-05-29 09:31', owner: 'momo' },
-  { id: 'Q003', question: '用户怎么看奥迪E7X与智己LS7的关系？', category: '用户口碑', riskLevel: '中', status: '运行中', models: '5/6', askCount: 84, negativeRate: 58, sourceCount: 6, lastRunAt: '2026-05-29 09:32', owner: 'zxy' },
-  { id: 'Q004', question: '奥迪E7X被质疑换壳的原因是什么？', category: '风险归因', riskLevel: '高', status: '运行中', models: '6/6', askCount: 72, negativeRate: 79, sourceCount: 8, lastRunAt: '2026-05-29 09:33', owner: 'zxy' },
-  { id: 'Q005', question: '换壳争议会不会影响用户购买奥迪E7X？', category: '购买影响', riskLevel: '中', status: '运行中', models: '5/6', askCount: 63, negativeRate: 64, sourceCount: 5, lastRunAt: '2026-05-29 09:34', owner: 'momo' },
-  { id: 'Q006', question: '品牌应该如何回应奥迪E7X换壳争议？', category: '处置建议', riskLevel: '中', status: '运行中', models: '4/6', askCount: 45, negativeRate: 42, sourceCount: 4, lastRunAt: '2026-05-29 09:35', owner: 'admin' },
-  { id: 'Q007', question: '奥迪E7X有没有配置缩水或虚假宣传问题？', category: '负面舆情', riskLevel: '高', status: '运行中', models: '6/6', askCount: 88, negativeRate: 73, sourceCount: 6, lastRunAt: '2026-05-29 09:36', owner: 'momo' },
-  { id: 'Q008', question: '奥迪E7X和智己LS7哪个更值得买？', category: '购买影响', riskLevel: '低', status: '暂停', models: '3/6', askCount: 36, negativeRate: 28, sourceCount: 3, lastRunAt: '2026-05-28 18:30', owner: 'admin' },
-  { id: 'Q009', question: '奥迪E7X车主投诉主要集中在哪些方面？', category: '服务投诉', riskLevel: '高', status: '运行中', models: '6/6', askCount: 69, negativeRate: 81, sourceCount: 7, lastRunAt: '2026-05-29 09:37', owner: 'zxy' },
-  { id: 'Q010', question: '奥迪E7X官方技术说明是否足够清晰？', category: '官方回应', riskLevel: '中', status: '运行中', models: '5/6', askCount: 52, negativeRate: 55, sourceCount: 5, lastRunAt: '2026-05-29 09:38', owner: 'momo' }
+  { id: 'Q001', question: '奥迪E7X与智己LS7换壳争议是否属实？', category: '事件核查', riskLevel: '高', status: '运行中', models: '6/6', askCount: 126, negativeRate: 82, sourceCount: 9, negativeSummary: '多模型回答倾向引用平台共用、外观相似和官方解释不足，容易形成“换壳”负面认知。', lastRunAt: '2026-05-29 09:30', owner: 'momo' },
+  { id: 'Q002', question: '奥迪E7X最近有什么负面新闻？', category: '负面舆情', riskLevel: '高', status: '运行中', models: '6/6', askCount: 98, negativeRate: 76, sourceCount: 7, negativeSummary: '回答集中提到换壳争议、配置缩水质疑和售后投诉，负面内容来源分散但重复度高。', lastRunAt: '2026-05-29 09:31', owner: 'momo' },
+  { id: 'Q003', question: '用户怎么看奥迪E7X与智己LS7的关系？', category: '用户口碑', riskLevel: '中', status: '运行中', models: '5/6', askCount: 84, negativeRate: 58, sourceCount: 6, negativeSummary: '用户讨论多围绕平台关系和品牌溢价，部分回答认为差异化说明不足。', lastRunAt: '2026-05-29 09:32', owner: 'zxy' },
+  { id: 'Q004', question: '奥迪E7X被质疑换壳的原因是什么？', category: '风险归因', riskLevel: '高', status: '运行中', models: '6/6', askCount: 72, negativeRate: 79, sourceCount: 8, negativeSummary: '模型归因集中在平台共用、设计相似、技术来源说明不足和媒体对比文章被反复引用。', lastRunAt: '2026-05-29 09:33', owner: 'zxy' },
+  { id: 'Q005', question: '换壳争议会不会影响用户购买奥迪E7X？', category: '购买影响', riskLevel: '中', status: '运行中', models: '5/6', askCount: 63, negativeRate: 64, sourceCount: 5, negativeSummary: '回答认为争议会放大价格敏感和观望情绪，降低部分潜在用户的购买信心。', lastRunAt: '2026-05-29 09:34', owner: 'momo' },
+  { id: 'Q006', question: '品牌应该如何回应奥迪E7X换壳争议？', category: '处置建议', riskLevel: '中', status: '运行中', models: '4/6', askCount: 45, negativeRate: 42, sourceCount: 4, negativeSummary: '模型建议补充官方技术差异、第三方测评和用户案例，避免只做口径式回应。', lastRunAt: '2026-05-29 09:35', owner: 'admin' },
+  { id: 'Q007', question: '奥迪E7X有没有配置缩水或虚假宣传问题？', category: '负面舆情', riskLevel: '高', status: '运行中', models: '6/6', askCount: 88, negativeRate: 73, sourceCount: 6, negativeSummary: '回答提及入门配置、选装价格和宣传表述差异，存在被归纳为配置诚意不足的风险。', lastRunAt: '2026-05-29 09:36', owner: 'momo' },
+  { id: 'Q008', question: '奥迪E7X和智己LS7哪个更值得买？', category: '购买影响', riskLevel: '低', status: '暂停', models: '3/6', askCount: 36, negativeRate: 28, sourceCount: 3, negativeSummary: '少量回答认为智己性价比更高，但整体仍会结合品牌、服务和渠道因素综合判断。', lastRunAt: '2026-05-28 18:30', owner: 'admin' },
+  { id: 'Q009', question: '奥迪E7X车主投诉主要集中在哪些方面？', category: '服务投诉', riskLevel: '高', status: '运行中', models: '6/6', askCount: 69, negativeRate: 81, sourceCount: 7, negativeSummary: '投诉内容集中在交付等待、权益兑现、售后响应和退款流程，平台证据较容易被引用。', lastRunAt: '2026-05-29 09:37', owner: 'zxy' },
+  { id: 'Q010', question: '奥迪E7X官方技术说明是否足够清晰？', category: '官方回应', riskLevel: '中', status: '运行中', models: '5/6', askCount: 52, negativeRate: 55, sourceCount: 5, negativeSummary: '回答认为官方说明还需要更具体的技术差异、调校差异和配置价值证据。', lastRunAt: '2026-05-29 09:38', owner: 'momo' }
 ]
 
 const questionListCategories = computed(() => [...new Set(questionListRows.map(item => item.category))])
@@ -2749,6 +3148,7 @@ const filteredQuestionList = computed(() => {
       item.question,
       item.category,
       item.riskLevel,
+      item.negativeSummary,
       item.status,
       item.models,
       item.owner
@@ -2804,17 +3204,6 @@ const riskDimensionTable = [
   { dimension: '处置建议', questions: 5, negativeRate: '41%', sourceCount: 3, topQuestion: '品牌应该如何回应换壳争议？' }
 ]
 
-const positiveWords = [
-  { text: '豪华感', size: 5, left: 42, top: 38 },
-  { text: '品牌力', size: 4, left: 18, top: 28 },
-  { text: '智能座舱', size: 4, left: 62, top: 24 },
-  { text: '舒适', size: 3, left: 28, top: 58 },
-  { text: '设计感', size: 3, left: 70, top: 55 },
-  { text: '操控稳定', size: 2, left: 50, top: 68 },
-  { text: '服务体系', size: 2, left: 12, top: 72 },
-  { text: '科技配置', size: 3, left: 78, top: 74 }
-]
-
 const negativeWords = [
   { text: '换壳争议', size: 5, left: 38, top: 36 },
   { text: '虚假宣传', size: 4, left: 18, top: 28 },
@@ -2824,6 +3213,17 @@ const negativeWords = [
   { text: '信任下降', size: 2, left: 50, top: 70 },
   { text: '配置缩水', size: 2, left: 12, top: 72 },
   { text: '口碑波动', size: 3, left: 78, top: 74 }
+]
+
+const overviewNegativeWords = [
+  { text: '换壳争议', size: 5, left: 50, top: 45 },
+  { text: '虚假宣传', size: 3, left: 23, top: 28 },
+  { text: '投诉维权', size: 3, left: 76, top: 28 },
+  { text: '质量质疑', size: 2, left: 24, top: 62 },
+  { text: '价格争议', size: 2, left: 75, top: 62 },
+  { text: '信任下降', size: 2, left: 50, top: 76 },
+  { text: '配置缩水', size: 1, left: 20, top: 82 },
+  { text: '口碑波动', size: 1, left: 80, top: 82 }
 ]
 
 const sourceCards = [
@@ -3214,15 +3614,205 @@ const futurePlans = [
 ]
 
 const monitorTasks = [
-  { id: 'SEN-T2401', questionCount: 36, models: '6/6', negativeRate: '68%', riskSources: 18, status: '已完成', startTime: '2026-05-29 02:00', result: '新增 3 条高风险信源' },
-  { id: 'SEN-T2400', questionCount: 36, models: '6/6', negativeRate: '64%', riskSources: 15, status: '已完成', startTime: '2026-05-28 18:30', result: '负面率上升 4%' },
-  { id: 'SEN-T2399', questionCount: 36, models: '5/6', negativeRate: '61%', riskSources: 14, status: '异常', startTime: '2026-05-28 02:00', result: 'Kimi 采集失败 2 次' }
+  { id: 'SEN-T2403', name: '每日舆情采集任务', questionCount: 36, modelList: ['DeepSeek', '豆包', 'Kimi', '通义千问', '文心一言', '腾讯元宝'], negativeRate: '68%', negativeRateValue: 68, riskSources: 18, trigger: 'schedule', triggerText: '定时任务', status: 'running', startTime: '2026-05-29 18:30', endTime: '', result: '正在采集高权重信源与模型回答' },
+  { id: 'SEN-T2402', name: '高风险问题复测任务', questionCount: 11, modelList: ['DeepSeek', '豆包', '通义千问'], negativeRate: '72%', negativeRateValue: 72, riskSources: 9, trigger: 'retest', triggerText: '复测任务', status: 'done', startTime: '2026-05-29 10:00', endTime: '2026-05-29 10:18', result: '换壳认知固化仍被 3 个模型引用' },
+  { id: 'SEN-T2401', name: '每日舆情采集任务', questionCount: 36, modelList: ['DeepSeek', '豆包', 'Kimi', '通义千问', '文心一言', '腾讯元宝'], negativeRate: '68%', negativeRateValue: 68, riskSources: 18, trigger: 'schedule', triggerText: '定时任务', status: 'done', startTime: '2026-05-29 02:00', endTime: '2026-05-29 02:26', result: '新增 3 条高风险信源' },
+  { id: 'SEN-T2400', name: '手动补充采集任务', questionCount: 36, modelList: ['DeepSeek', '豆包', 'Kimi', '通义千问', '文心一言', '腾讯元宝'], negativeRate: '64%', negativeRateValue: 64, riskSources: 15, trigger: 'manual', triggerText: '手动执行', status: 'done', startTime: '2026-05-28 18:30', endTime: '2026-05-28 18:55', result: '新增 2 条舆情线索，风险信源集中在汽车社区' },
+  { id: 'SEN-T2399', name: '每日舆情采集任务', questionCount: 36, modelList: ['DeepSeek', '豆包', 'Kimi', '通义千问', '文心一言'], negativeRate: '61%', negativeRateValue: 61, riskSources: 14, trigger: 'schedule', triggerText: '定时任务', status: 'failed', startTime: '2026-05-28 02:00', endTime: '2026-05-28 02:08', result: 'Kimi 采集失败 2 次' }
 ]
 
-const reports = [
-  { name: '奥迪E7X换壳舆情日报', period: '2026-05-29', risk: '极度高危', negativeRate: '68%', summary: '风险热度仍在高位，建议优先处理论坛与短视频信源。' },
-  { name: '奥迪E7X换壳事件周度复盘', period: '2026-05-23 至 05-29', risk: '高危', negativeRate: '64%', summary: '争议集中在事件核查和购买影响两个方向。' }
+const sentimentTaskStatusMeta = {
+  running: { text: '执行中', type: 'primary' },
+  done: { text: '已完成', type: 'success' },
+  failed: { text: '失败', type: 'danger' }
+}
+
+const filteredMonitorTasks = computed(() => {
+  const key = taskKeyword.value.trim().toLowerCase()
+  return monitorTasks.filter(task => {
+    const statusMatched = taskStatus.value === 'all' || task.status === taskStatus.value
+    const triggerMatched = taskTrigger.value === 'all' || task.trigger === taskTrigger.value
+    const keywordMatched = !key || `${task.id}${task.name}${task.result}`.toLowerCase().includes(key)
+    return statusMatched && triggerMatched && keywordMatched
+  })
+})
+
+const taskReportTypeText = {
+  daily: '日报',
+  weekly: '周报',
+  monthly: '月报',
+  custom: '自定义'
+}
+
+const taskReportStatusMeta = {
+  pending: { text: '排队中', type: 'info' },
+  processing: { text: '生成中', type: 'primary' },
+  done: { text: '已完成', type: 'success' },
+  failed: { text: '失败', type: 'danger' }
+}
+
+const taskReports = ref([
+  { id: 'SEN-R-052901', type: 'daily', name: '奥迪E7X换壳舆情_日报_2026-05-29', period: '2026-05-29', negativeRate: '68%', negativeRateValue: 68, riskSources: 18, summary: '风险热度仍在高位，建议优先处理论坛与短视频信源。', status: 'done', createdAt: '2026-05-29 10:36', completedAt: '2026-05-29 10:39' },
+  { id: 'SEN-R-052902', type: 'weekly', name: '奥迪E7X换壳舆情_周报_2026-05-23_2026-05-29', period: '2026-05-23 至 2026-05-29', negativeRate: '64%', negativeRateValue: 64, riskSources: 42, summary: '争议集中在事件核查和购买影响两个方向。', status: 'processing', createdAt: '2026-05-29 11:12', completedAt: '' },
+  { id: 'SEN-R-052801', type: 'custom', name: '奥迪E7X换壳舆情_自定义_2026-05-20_2026-05-28', period: '2026-05-20 至 2026-05-28', negativeRate: '59%', negativeRateValue: 59, riskSources: 36, summary: '换壳争议持续被 AI 回答引用，需要补充官方解释。', status: 'failed', createdAt: '2026-05-28 20:10', completedAt: '2026-05-28 20:16' }
+])
+
+const filteredTaskReports = computed(() => taskReports.value.filter(report => taskReportTypeFilter.value === 'all' || report.type === taskReportTypeFilter.value))
+
+const taskReportTypeOptions = [
+  { value: 'daily', label: '日报', desc: '选择某一天生成日报' },
+  { value: 'weekly', label: '周报', desc: '选择一周生成周报' },
+  { value: 'monthly', label: '月报', desc: '选择一月生成月报' },
+  { value: 'custom', label: '自定义', desc: '选择任意时间段' }
 ]
+
+const exportStatusMeta = {
+  pending: { text: '排队中', type: 'info' },
+  processing: { text: '生成中', type: 'primary' },
+  success: { text: '已完成', type: 'success' },
+  failed: { text: '失败', type: 'danger' }
+}
+
+const exportJobs = ref([
+  {
+    id: 'SEN-EXP-052901',
+    type: 'daily',
+    name: '舆情日报',
+    reportName: '奥迪E7X换壳舆情_日报_2026-05-29',
+    project: '奥迪E7X换壳舆情',
+    source: '舆情概览',
+    range: '2026-05-29',
+    createdAt: '2026-05-29 10:36',
+    status: 'success',
+    fileSize: '2.8 MB',
+    finishedAt: '2026-05-29 10:39'
+  },
+  {
+    id: 'SEN-EXP-052902',
+    type: 'weekly',
+    name: '舆情周报',
+    reportName: '奥迪E7X换壳舆情_周报_2026-05-23_2026-05-29',
+    project: '奥迪E7X换壳舆情',
+    source: '舆情概览',
+    range: '2026-05-23 至 2026-05-29',
+    createdAt: '2026-05-29 11:12',
+    status: 'processing',
+    fileSize: '-',
+    finishedAt: ''
+  },
+  {
+    id: 'SEN-EXP-052903',
+    type: 'sentiment-report',
+    name: '舆情分析报告',
+    reportName: '奥迪E7X换壳舆情_舆情报告_2026-05-23_2026-05-29',
+    project: '奥迪E7X换壳舆情',
+    source: '手动生成',
+    range: '2026-05-23 至 2026-05-29',
+    createdAt: '2026-05-29 11:30',
+    status: 'pending',
+    fileSize: '-',
+    finishedAt: ''
+  },
+  {
+    id: 'SEN-EXP-052904',
+    type: 'source-data',
+    name: '信源明细',
+    reportName: '奥迪E7X换壳舆情_信源明细_2026-05-23_2026-05-29',
+    project: '奥迪E7X换壳舆情',
+    source: '信源列表',
+    range: '2026-05-23 至 2026-05-29',
+    createdAt: '2026-05-29 11:42',
+    status: 'success',
+    fileSize: '1.6 MB',
+    finishedAt: '2026-05-29 11:43'
+  },
+  {
+    id: 'SEN-EXP-052905',
+    type: 'question-data',
+    name: '问题明细',
+    reportName: '奥迪E7X换壳舆情_问题明细_2026-05-23_2026-05-29',
+    project: '奥迪E7X换壳舆情',
+    source: '问题列表',
+    range: '2026-05-23 至 2026-05-29',
+    createdAt: '2026-05-29 12:05',
+    status: 'failed',
+    fileSize: '-',
+    finishedAt: '2026-05-29 12:08'
+  }
+])
+
+const filteredExportJobs = computed(() => {
+  const key = exportKeyword.value.trim().toLowerCase()
+  return exportJobs.value.filter(job => {
+    const statusMatched = exportStatus.value === 'all' || job.status === exportStatus.value
+    const typeMatched = exportType.value === 'all' || job.type === exportType.value
+    const keywordMatched = !key || `${job.name}${job.reportName}${job.project}${job.source}`.toLowerCase().includes(key)
+    return statusMatched && typeMatched && keywordMatched
+  })
+})
+
+const exportSummaryCards = computed(() => [
+  { label: '全部导出', value: exportJobs.value.length },
+  { label: '生成中', value: exportJobs.value.filter(job => job.status === 'processing' || job.status === 'pending').length },
+  { label: '已完成', value: exportJobs.value.filter(job => job.status === 'success').length },
+  { label: '失败', value: exportJobs.value.filter(job => job.status === 'failed').length }
+])
+
+const refreshSentimentTasks = () => {
+  ElMessage.success('监控任务已刷新')
+}
+
+const runSentimentTask = () => {
+  ElMessage.success('已创建手动舆情监控任务')
+}
+
+const openTaskDetail = (row) => {
+  ElMessage.info(`查看任务详情：${row.id}`)
+}
+
+const exportTaskData = (row) => {
+  exportJobs.value.unshift({
+    id: `SEN-EXP-${Date.now()}`,
+    type: 'question-data',
+    name: '任务数据',
+    reportName: `${row.id}_舆情任务数据_${row.startTime.slice(0, 10)}`,
+    project: '奥迪E7X换壳舆情',
+    source: '监控任务',
+    range: row.startTime,
+    createdAt: '2026-05-29 12:40',
+    status: 'pending',
+    fileSize: '-',
+    finishedAt: ''
+  })
+  ElMessage.success('已创建任务数据导出，可在导出中心查看进度')
+}
+
+const createTaskReport = () => {
+  const typeText = taskReportTypeText[taskReportForm.type]
+  taskReports.value.unshift({
+    id: `SEN-R-${Date.now()}`,
+    type: taskReportForm.type,
+    name: `奥迪E7X换壳舆情_${typeText}_2026-05-23_2026-05-29`,
+    period: '2026-05-23 至 2026-05-29',
+    negativeRate: '68%',
+    negativeRateValue: 68,
+    riskSources: 18,
+    summary: '报告生成中，完成后可下载查看。',
+    status: 'pending',
+    createdAt: '2026-05-29 12:45',
+    completedAt: ''
+  })
+  taskReportVisible.value = false
+  ElMessage.success('已创建报告生成任务，可在导出中心下载')
+}
+
+const viewTaskReport = (row) => {
+  ElMessage.info(`查看报告：${row.name}`)
+}
+
+const downloadTaskReport = (row) => {
+  ElMessage.success(`开始下载：${row.name}`)
+}
 
 const configItems = [
   { title: '监控主体', page: 'subject', desc: '配置品牌、产品、人物、机构或事件专项，以及别名和关联实体。' },
@@ -3577,8 +4167,20 @@ const removeHighWeightSource = (source) => {
   if (index >= 0) highWeightSourceConfig.sources.splice(index, 1)
 }
 
-const openReport = () => {
+const downloadExportJob = (row) => {
+  ElMessage.success(`开始下载：${row.reportName}`)
   window.open('/ai_sentiment_insight_report.html?id=SEN-MOCK-AUDI&risk=%E6%9E%81%E5%BA%A6%E9%AB%98%E5%8D%B1&task=preview', '_blank')
+}
+
+const retryExportJob = (row) => {
+  row.status = 'pending'
+  row.finishedAt = ''
+  row.fileSize = '-'
+  ElMessage.success(`${row.reportName} 已重新加入导出队列`)
+}
+
+const refreshExportJobs = () => {
+  ElMessage.success('导出任务已刷新')
 }
 </script>
 
@@ -3610,7 +4212,7 @@ const openReport = () => {
 }
 .filter-card { padding: 16px; margin-bottom: 20px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
 .filter-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
-.selected-info { margin-left: auto; color: #245bff; background: #f0f5ff; border: 1px solid #dbeafe; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; }
+.selected-info { color: #245bff; background: #f0f5ff; border: 1px solid #dbeafe; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; }
 .mb-16 { margin-bottom: 16px; }
 .overview-section-title {
   display: flex;
@@ -3626,13 +4228,109 @@ const openReport = () => {
   color: #8a95a6;
   font-size: 13px;
 }
+.overview-section-title.compact { margin-top: 0; }
+.overview-top-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 16px;
+  align-items: stretch;
+}
+.overview-metric-matrix {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.overview-focus-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) 360px;
+  gap: 16px;
+  align-items: stretch;
+}
+.overview-main-panel,
+.overview-side-panel {
+  min-width: 0;
+}
+.overview-main-panel {
+  display: flex;
+  flex-direction: column;
+}
+.overview-side-panel {
+  display: flex;
+  min-height: 100%;
+}
+.overview-side-panel .focus-card {
+  width: 100%;
+  min-height: 100%;
+}
+.overview-side-panel .focus-card :deep(.el-card__body) {
+  height: calc(100% - 56px);
+  overflow-y: auto;
+}
+.overview-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+.overview-bottom-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.focus-card :deep(.el-card__body) { padding-top: 12px; }
 .metric-card, .chart-card, .content-card, .config-card { border: 1px solid #e5e7eb; border-radius: 8px; }
 .metric-card { min-height: 112px; }
+.metric-card.compact-metric {
+  min-height: 122px;
+}
+.metric-card.compact-metric :deep(.el-card__body) {
+  min-height: 122px;
+  display: flex;
+  flex-direction: column;
+  padding: 15px 18px;
+}
 .metric-label { color: #909399; font-size: 13px; margin-bottom: 10px; }
 .metric-value { color: #2b65f0; font-size: 26px; font-weight: 800; line-height: 1; }
 .metric-value.danger, .summary-card .danger { color: #f56c6c; }
 .metric-value.warning { color: #e6a23c; }
+.metric-secondary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 7px;
+  color: #64748b;
+  font-size: 12px;
+}
+.metric-secondary strong {
+  color: #111827;
+  font-size: 16px;
+  font-weight: 800;
+}
 .metric-desc { margin-top: 10px; color: #64748b; font-size: 12px; }
+.metric-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: auto;
+  padding-top: 10px;
+}
+.metric-tags :deep(.el-tag) {
+  height: 22px;
+  padding: 0 7px;
+  border-color: #dbeafe;
+  background: #f8fbff;
+  color: #2563eb;
+}
+.metric-tags :deep(.source-weight-high) {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #ea580c;
+}
+.metric-tags :deep(.source-weight-medium) {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #2563eb;
+}
 .card-head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: #111827; }
 .title-with-help { display: inline-flex; align-items: center; gap: 6px; }
 .title-with-help .el-icon { color: #94a3b8; cursor: help; }
@@ -3641,6 +4339,7 @@ const openReport = () => {
 .view-link { border: 0; background: transparent; color: #409eff; cursor: pointer; }
 .trend-chart { height: 280px; display: flex; flex-direction: column; }
 .source-trend-chart { height: 260px; display: flex; flex-direction: column; }
+.source-trend-chart.compact-chart { height: 230px; }
 .trend-plot { flex: 1; min-height: 0; padding: 8px 12px 0; }
 .trend-plot svg { width: 100%; height: 100%; display: block; }
 .grid-line { stroke: #e5e7eb; stroke-width: 1; }
@@ -3651,6 +4350,52 @@ const openReport = () => {
 .source-trend-bar { fill: rgba(37, 99, 235, 0.14); }
 .source-trend-dot { fill: #2563eb; stroke: #fff; stroke-width: 2; }
 .source-trend-label { fill: #2563eb; font-size: 12px; font-weight: 700; }
+.dual-trend-line {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.dual-trend-line.danger { stroke: #ef4444; }
+.dual-trend-line.purple { stroke: #8b5cf6; }
+.dual-trend-line.blue { stroke: #2563eb; }
+.dual-trend-line.orange { stroke: #f59e0b; }
+.dual-trend-dot {
+  stroke: #fff;
+  stroke-width: 2;
+}
+.dual-trend-dot.danger { fill: #ef4444; }
+.dual-trend-dot.purple { fill: #8b5cf6; }
+.dual-trend-dot.blue { fill: #2563eb; }
+.dual-trend-dot.orange { fill: #f59e0b; }
+.dual-trend-label {
+  font-size: 12px;
+  font-weight: 700;
+}
+.dual-trend-label.danger { fill: #ef4444; }
+.dual-trend-label.blue { fill: #2563eb; }
+.trend-legend {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  padding-bottom: 6px;
+  color: #64748b;
+  font-size: 12px;
+}
+.trend-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.trend-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.trend-legend i.danger { background: #ef4444; }
+.trend-legend i.purple { background: #8b5cf6; }
+.trend-legend i.blue { background: #2563eb; }
+.trend-legend i.orange { background: #f59e0b; }
 .axis-row { flex: 0 0 28px; display: flex; justify-content: space-between; padding: 2px 20px 0; color: #6b7280; font-size: 12px; }
 .card-head small { color: #94a3b8; font-size: 12px; font-weight: 500; }
 .rank-bars { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
@@ -3659,6 +4404,7 @@ const openReport = () => {
 .rank-bar-item i { display: block; height: 100%; background: linear-gradient(90deg, #f59e0b, #ef4444); }
 .rank-bar-item b { position: absolute; right: 8px; top: 4px; color: #fff; font-size: 12px; }
 .source-top-list { display: flex; flex-direction: column; gap: 7px; padding: 4px 0; }
+.source-top-list.compact { gap: 4px; padding: 0; }
 .source-top-item {
   width: 100%;
   min-height: 28px;
@@ -3674,6 +4420,7 @@ const openReport = () => {
   text-align: left;
   cursor: pointer;
 }
+.source-top-list.compact .source-top-item { min-height: 26px; padding: 3px 0; }
 .source-top-item:hover .source-top-name { color: #2563eb; text-decoration: underline; text-underline-offset: 3px; }
 .source-top-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .source-top-item strong { color: #2563eb; font-size: 13px; }
@@ -3904,6 +4651,8 @@ const openReport = () => {
 .clue-pool-card :deep(.el-card__body) { padding-top: 12px; }
 .clue-tabs :deep(.el-tabs__header) { margin: 0 0 10px; }
 .clue-tabs :deep(.el-tabs__nav-wrap::after) { height: 1px; background: #e5e7eb; }
+.compact-tabs :deep(.el-tabs__header) { margin-bottom: 8px; }
+.compact-tabs :deep(.el-table__cell) { padding: 6px 0; }
 .clue-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3935,6 +4684,36 @@ const openReport = () => {
   font-size: 12px;
 }
 .clue-title { color: #111827; }
+.clue-model-icons {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 96px;
+}
+.clue-model-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: -6px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+.clue-model-icon:first-child { margin-left: 0; }
+.clue-model-icon:nth-child(2n) {
+  background: #fff7ed;
+  color: #ea580c;
+}
+.clue-model-icon:nth-child(3n) {
+  background: #f0fdf4;
+  color: #16a34a;
+}
 .clue-detail-card :deep(.el-card__body) { padding-top: 14px; }
 .clue-detail-desc {
   margin: 0 0 14px;
@@ -3993,6 +4772,10 @@ const openReport = () => {
 }
 .muted-text { color: #94a3b8; font-size: 12px; }
 .insight-list { margin: 0; padding-left: 18px; color: #334155; line-height: 1.9; font-size: 14px; }
+.insight-list.compact {
+  font-size: 13px;
+  line-height: 1.75;
+}
 .source-cell { display: flex; flex-direction: column; gap: 4px; }
 .source-cell span { color: #94a3b8; font-size: 12px; }
 .source-list-card { overflow: hidden; }
@@ -4000,6 +4783,8 @@ const openReport = () => {
 .source-link { color: #2563eb; text-decoration: none; font-weight: 600; }
 .source-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 .source-url { color: #64748b; font-weight: 500; }
+.nowrap-column .cell,
+:deep(.nowrap-column .cell) { white-space: nowrap; }
 .conversation-manage-card { padding: 0; }
 .conversation-tabs :deep(.el-tabs__header) { margin-bottom: 16px; }
 .conversation-card-filter { width: 320px; margin-bottom: 14px; }
@@ -4165,10 +4950,49 @@ const openReport = () => {
 .page-toolbar h2 { margin: 0 0 6px; font-size: 20px; color: #111827; }
 .page-toolbar p { margin: 0; color: #64748b; font-size: 13px; }
 .toolbar-actions { display: flex; align-items: center; gap: 10px; }
+.export-center-page { display: flex; flex-direction: column; gap: 16px; }
+.toolbar-title h2 { margin: 0; color: #111827; font-size: 22px; }
+.toolbar-title p { margin: 8px 0 0; color: #8a95a6; font-size: 14px; }
+.search-input { width: 280px; }
+.summary-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .summary-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; min-height: 98px; }
 .summary-card span { color: #64748b; font-size: 13px; }
 .summary-card strong { display: block; margin-top: 8px; color: #111827; font-size: 24px; }
 .summary-card p { margin: 8px 0 0; color: #94a3b8; font-size: 12px; }
+.export-card { border: 1px solid #e5e7eb; border-radius: 8px; }
+.table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+:deep(.export-table .el-table__cell) { white-space: nowrap; }
+.plan-card,
+.task-card,
+.report-card { border: 1px solid #e5e7eb; border-radius: 8px; }
+.section-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.section-title { display: block; color: #111827; font-weight: 800; font-size: 15px; }
+.section-subtitle { display: block; margin-top: 4px; color: #94a3b8; font-size: 12px; font-weight: 500; }
+.plan-content { min-width: 0; }
+.plan-title { color: #111827; font-weight: 800; }
+.plan-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; color: #64748b; font-size: 12px; }
+.task-card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.table-extra { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.model-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+:deep(.task-table .el-table__cell),
+:deep(.report-table .el-table__cell) { white-space: nowrap; }
+.manual-report-title-row { display: flex; align-items: baseline; gap: 12px; }
+.manual-report-title-row span { color: #111827; font-size: 18px; font-weight: 800; }
+.manual-report-title-row em { color: #94a3b8; font-size: 12px; font-style: normal; }
+.manual-report-form { padding-top: 4px; }
+.manual-report-section.no-label :deep(.el-form-item__label) { display: none; }
+.report-type-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; width: 100%; }
+.report-type-card { border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; padding: 12px; text-align: left; cursor: pointer; }
+.report-type-card strong { display: block; color: #111827; font-size: 14px; }
+.report-type-card span { display: block; margin-top: 6px; color: #94a3b8; font-size: 12px; line-height: 1.4; }
+.report-type-card.active { border-color: #2563eb; background: #eff6ff; }
+.manual-time-box { min-height: 34px; }
+.time-picker-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.week-range-preview { color: #64748b; font-size: 12px; }
+.manual-report-tip { padding: 10px 12px; border: 1px solid #dbeafe; border-radius: 8px; background: #eff6ff; color: #2563eb; font-size: 13px; }
+.manual-report-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+.manual-report-actions { display: flex; align-items: center; gap: 10px; }
+.report-cost-tip { color: #f59e0b; font-size: 13px; font-weight: 800; }
 .top-list-item { display: grid; grid-template-columns: 28px 1fr 56px; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
 .top-list-item button { border: 0; background: transparent; color: #334155; text-align: left; cursor: pointer; }
 .rank-no { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 999px; background: #eef4ff; color: #2563eb; font-weight: 800; font-size: 12px; }
@@ -4736,7 +5560,6 @@ const openReport = () => {
   color: #334155;
   -webkit-text-fill-color: #334155;
 }
-.word-cloud-row { margin-top: 16px; }
 .word-cloud {
   position: relative;
   height: 260px;
@@ -4744,6 +5567,8 @@ const openReport = () => {
   border-radius: 8px;
   background: #f8fafc;
 }
+.overview-word-card :deep(.el-card__body) { padding: 14px 16px 16px; }
+.word-cloud.overview-word-cloud { height: 190px; }
 .word-cloud span {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -4751,15 +5576,24 @@ const openReport = () => {
   font-weight: 800;
   line-height: 1;
 }
-.positive-cloud span { color: #16a34a; }
 .negative-cloud span { color: #ef4444; }
 .word-cloud .size-5 { font-size: 36px; }
 .word-cloud .size-4 { font-size: 28px; }
 .word-cloud .size-3 { font-size: 22px; }
 .word-cloud .size-2 { font-size: 17px; }
+.word-cloud.overview-word-cloud .size-5 { font-size: 31px; }
+.word-cloud.overview-word-cloud .size-4 { font-size: 25px; }
+.word-cloud.overview-word-cloud .size-3 { font-size: 20px; }
+.word-cloud.overview-word-cloud .size-2 { font-size: 16px; }
+.word-cloud.overview-word-cloud .size-1 { font-size: 13px; }
 
 @media (max-width: 1200px) {
   .project-info-header { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .overview-top-grid,
+  .overview-focus-grid,
+  .overview-analysis-grid {
+    grid-template-columns: 1fr;
+  }
   .actions { justify-content: flex-start; }
 }
 </style>

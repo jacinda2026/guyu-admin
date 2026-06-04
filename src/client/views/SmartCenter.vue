@@ -65,8 +65,14 @@
       class="skill-run-dialog"
       destroy-on-close
     >
-      <div v-if="activeSkill" class="run-dialog-body">
-        <p class="run-dialog-desc">{{ activeSkill.description }}</p>
+        <div v-if="activeSkill" class="run-dialog-body">
+          <p class="run-dialog-desc">{{ activeSkill.description }}</p>
+          <div v-if="activeSkill.analysisQuestions?.length" class="analysis-question-list">
+            <div class="analysis-question-title">可分析的问题</div>
+            <div class="analysis-question-items">
+              <span v-for="question in activeSkill.analysisQuestions" :key="question">{{ question }}</span>
+            </div>
+          </div>
         <el-form label-position="top" class="run-form">
           <el-form-item
             v-for="field in activeSkill.inputSchema || []"
@@ -145,6 +151,27 @@ const runResult = ref('')
 const runForm = reactive({})
 
 const defaultSkills = [
+  {
+    id: 'source-gap-analysis',
+    name: '信源布局差异分析',
+    description: '基于自有信源库和全网采集信源，分析信源布局缺口、高频引用信源和真实引用差异。',
+    type: 'data',
+    creator: '范范',
+    updatedAt: '06-04 16:20',
+    runMode: 'local',
+    icon: 'DataAnalysis',
+    theme: 'theme-cyan',
+    analysisQuestions: [
+      '我还需要完善哪些信源？',
+      '哪些全网高频信源还没有布局？',
+      '我的信源和全网真实引用之间差在哪里？'
+    ],
+    inputSchema: [
+      { key: 'projectName', label: '项目/品牌', type: 'text', required: true, placeholder: '例如：卓牧羊奶粉项目' },
+      { key: 'ownedSources', label: '自有信源库概况', type: 'textarea', placeholder: '可填写官网、旗舰店、知乎专栏、小红书账号等已维护信源' },
+      { key: 'collectedSources', label: '全网高频引用信源概况', type: 'textarea', placeholder: '可填写当前全网采集信源里引用次数高的平台、文章或域名' }
+    ]
+  },
   {
     id: 'brand-question-expand',
     name: '基础品牌/产品信息的问题库拓展',
@@ -318,6 +345,30 @@ const runActiveSkill = async () => {
 
   running.value = true
   runResult.value = ''
+  if (activeSkill.value.runMode === 'local') {
+    const projectName = runForm.projectName || '当前项目'
+    runResult.value = [
+      `【${projectName}｜信源布局差异分析】`,
+      '',
+      '1. 我还需要完善哪些信源？',
+      '- 优先完善能被大模型稳定引用的权威信源：官网FAQ、品牌/产品百科、官方旗舰店、第三方测评页、行业白皮书。',
+      '- 对“已收录但引用次数低”的自有信源，补充结构化标题、摘要、核心问题答案和可验证数据。',
+      '- 对“未收录”的自有信源，优先处理可被搜索引擎抓取的页面、站点地图、页面可访问性和内容更新频率。',
+      '',
+      '2. 哪些全网高频信源还没有布局？',
+      '- 对比全网采集信源的引用次数 TOP 列表，重点检查知乎、小红书、京东/天猫、垂直媒体、百科/问答平台是否已有对应自有或合作内容。',
+      '- 如果竞品测评页、低质排行榜页、论坛帖被多模型引用，但自有信源库没有同类内容，需要补充同主题的正向解释信源。',
+      '- 对高频但不可控的第三方信源，标记为“需替代布局”，用更权威的官方/合作/媒体内容承接同一批问题。',
+      '',
+      '3. 我的信源和全网真实引用之间差在哪里？',
+      '- 看覆盖差：自有信源是否出现在大模型回答引用里；未被引用说明收录或权威不足。',
+      '- 看问题差：自有信源希望影响的问题，是否就是全网真实引用最多的问题；不一致说明内容主题没有对齐问题配置。',
+      '- 看模型差：同一信源是否只被少数模型引用；如果只覆盖豆包/DeepSeek，需检查其他模型依赖的平台和语料来源。',
+      '- 看平台差：全网真实引用集中在哪些平台，自有信源库是否覆盖同类平台。'
+    ].join('\n')
+    running.value = false
+    return
+  }
   try {
     const response = await fetch(`/api/client/skills/${encodeURIComponent(activeSkill.value.id)}/run`, {
       method: 'POST',
@@ -448,6 +499,40 @@ onMounted(loadSkills)
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.analysis-question-list {
+  margin: 12px 0 16px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.analysis-question-title {
+  color: #111827;
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.analysis-question-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.analysis-question-items span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .skill-tag-row {

@@ -50,6 +50,7 @@
           </template>
           <el-menu-item :index="`/project/${projectId}/config/issue`">问题配置</el-menu-item>
           <el-menu-item :index="`/project/${projectId}/config/competitor`">竞品配置</el-menu-item>
+          <el-menu-item :index="`/project/${projectId}/config/source`">信源管理</el-menu-item>
           <el-menu-item :index="`/project/${projectId}/config/monitor`">监控配置</el-menu-item>
         </el-menu-item-group>
       </el-menu>
@@ -223,6 +224,23 @@ const analysisGuides = {
       '如何提升AI回答中的品牌可信度？'
     ],
     placeholder: '输入客户关注的问题，例如：给我一份信源分析报告'
+  },
+  sourceConfig: {
+    title: '信源管理智能分析',
+    subtitle: '自有信源库与全网真实引用差异',
+    heading: '可以直接分析信源布局问题',
+    description: '我会围绕自有信源库、全网采集信源、引用次数、关联问题和关联模型，分析哪些信源还需要补齐、哪些高频信源尚未布局，以及真实引用和自有布局之间的差距。',
+    points: [
+      '判断自有信源库还缺哪些官网、百科、测评、社媒或电商信源',
+      '识别全网采集信源里引用次数高但尚未布局的信源',
+      '对比自有信源和大模型回答真实引用之间的平台、问题和模型差异'
+    ],
+    prompts: [
+      '我还需要完善哪些信源？',
+      '哪些全网高频信源还没有布局？',
+      '我的信源和全网真实引用之间差在哪里？'
+    ],
+    placeholder: '输入信源管理问题，例如：哪些全网高频信源还没有布局？'
   },
   monitor: {
     title: '问题表现分析',
@@ -417,6 +435,7 @@ const currentPageTitle = computed(() => {
   const path = route.path
   if (path.includes('/config/issue')) return '问题配置'
   if (path.includes('/config/competitor')) return '竞品配置'
+  if (path.includes('/config/source')) return '信源管理'
   if (path.includes('/config/monitor')) return '监控配置'
   if (path.includes('/dashboard')) return '数据概览'
   if (path.includes('/sources')) return '信源统计'
@@ -431,6 +450,7 @@ const currentAnalysisGuide = computed(() => {
   if (path.includes('/config/issue')) return analysisGuides.questionConfig
   if (path.includes('/config/competitor')) return analysisGuides.competitorConfig
   if (path.includes('/config/monitor')) return analysisGuides.monitorConfig
+  if (path.includes('/config/source')) return analysisGuides.sourceConfig
   if (path.includes('/sources')) return analysisGuides.sources
   if (path.includes('/monitor')) return analysisGuides.monitor
   if (path.includes('/tasks')) return analysisGuides.tasks
@@ -496,6 +516,10 @@ const goCurrentPage = () => {
   }
   if (route.path.includes('/config/competitor')) {
     router.push(`/project/${projectId.value}/config/competitor`)
+    return
+  }
+  if (route.path.includes('/config/source')) {
+    router.push(`/project/${projectId.value}/config/source`)
     return
   }
   if (route.path.includes('/config/monitor')) {
