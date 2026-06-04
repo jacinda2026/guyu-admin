@@ -270,6 +270,8 @@
 
       <template #footer>
         <div class="dialog-footer">
+          <span class="billing-rule">基础调用、深度思考、截图均按 ¥0.10/问题/次/模型计费</span>
+          <span class="billing-estimate">预计单天消耗 <strong>¥{{ createEstimatedDailyCost }}</strong></span>
           <el-button @click="createDialogVisible = false">取消</el-button>
           <el-button type="primary" @click="submitSentimentTask">
             <el-icon><Plus /></el-icon>
@@ -338,6 +340,21 @@ const weekdayOptions = [
 ]
 
 const createQuestionCount = computed(() => createForm.questions.split('\n').map(item => item.trim()).filter(Boolean).length)
+const MODEL_UNIT_PRICE = 0.1
+const createEstimatedDailyCost = computed(() => {
+  const questionCount = createQuestionCount.value
+  const dailyTimes = Number(createForm.monitor.dailyTimes) || 0
+  const enabledModels = createForm.models.filter(item => item.enabled)
+  const baseUnits = questionCount * dailyTimes * enabledModels.length
+  const enhancedUnits = createForm.collectChannel === 'enhanced'
+    ? enabledModels.reduce((total, model) => {
+      const deepThinkingUnits = model.deepThinking ? 1 : 0
+      const screenshotUnits = model.allScreenshot || model.mentionScreenshot ? 1 : 0
+      return total + questionCount * dailyTimes * (deepThinkingUnits + screenshotUnits)
+    }, 0)
+    : 0
+  return ((baseUnits + enhancedUnits) * MODEL_UNIT_PRICE).toFixed(2)
+})
 
 const overviewStats = computed(() => {
   const total = sentimentTasksData.value.length
@@ -601,7 +618,10 @@ const inferSentimentProjectType = (entityType, topic, questions) => {
 .model-children { margin-top: 12px; padding-top: 10px; border-top: 1px solid #bfdbfe; display: flex; flex-direction: column; gap: 8px; }
 .model-children :deep(.el-checkbox) { margin-right: 0; }
 .screenshot-checks { display: flex; gap: 14px; flex-wrap: wrap; }
-.dialog-footer { display: flex; justify-content: flex-end; gap: 12px; }
+.dialog-footer { display: flex; justify-content: flex-end; align-items: center; gap: 12px; width: 100%; }
+.billing-rule { margin-right: auto; color: #94a3b8; font-size: 13px; white-space: nowrap; }
+.billing-estimate { color: #64748b; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.billing-estimate strong { color: #dc2626; font-size: 18px; font-weight: 900; }
 
 @media (max-width: 900px) {
   .filter-bar { align-items: stretch; flex-direction: column; gap: 12px; }

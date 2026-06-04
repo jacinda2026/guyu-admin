@@ -266,11 +266,13 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const MONITOR_METRIC_CONFIG_KEY = 'guyu-monitor-metric-config'
 const editing = ref(false)
+const MODEL_UNIT_PRICE = 0.1
+const PROJECT_QUESTION_COUNT = 40
 
 const handleEditSave = async () => {
   if (!editing.value) {
@@ -284,6 +286,7 @@ const handleEditSave = async () => {
   }
 
   try {
+    setBillingConfirmTip(estimatedDailyCost.value)
     await ElMessageBox.confirm(
       '保存后会立即生效，是否确认保存当前监控配置？',
       '确认保存',
@@ -291,6 +294,7 @@ const handleEditSave = async () => {
         confirmButtonText: '确认保存',
         cancelButtonText: '取消',
         type: 'warning',
+        customClass: 'billing-confirm-box',
         closeOnClickModal: false,
         closeOnPressEscape: false
       }
@@ -300,6 +304,8 @@ const handleEditSave = async () => {
     ElMessage.success('保存成功，配置已立即生效')
   } catch (error) {
     // 用户取消保存，继续保持编辑状态
+  } finally {
+    clearBillingConfirmTip()
   }
 }
 
@@ -362,6 +368,28 @@ const models = reactive([
   { name: '文心一言', enabled: true, deepThinking: false, allScreenshot: false, mentionScreenshot: false },
   { name: 'Kimi', enabled: true, deepThinking: false, allScreenshot: false, mentionScreenshot: true }
 ])
+
+const estimatedDailyCost = computed(() => {
+  const dailyTimes = Number(basic.askTimes) || 0
+  const enabledModels = models.filter(item => item.enabled)
+  const baseUnits = PROJECT_QUESTION_COUNT * dailyTimes * enabledModels.length
+  const enhancedUnits = collectChannel.value === 'enhanced'
+    ? enabledModels.reduce((total, model) => {
+      const deepThinkingUnits = model.deepThinking ? 1 : 0
+      const screenshotUnits = model.allScreenshot || model.mentionScreenshot ? 1 : 0
+      return total + PROJECT_QUESTION_COUNT * dailyTimes * (deepThinkingUnits + screenshotUnits)
+    }, 0)
+    : 0
+  return ((baseUnits + enhancedUnits) * MODEL_UNIT_PRICE).toFixed(2)
+})
+
+const setBillingConfirmTip = (amount) => {
+  document.documentElement.style.setProperty('--billing-confirm-tip', `"预计单天消耗：¥${amount}"`)
+}
+
+const clearBillingConfirmTip = () => {
+  document.documentElement.style.removeProperty('--billing-confirm-tip')
+}
 
 const handleScreenshotChange = (model, type, value) => {
   if (!value) return
@@ -453,6 +481,19 @@ watch(
   min-width: 72px;
   height: 40px;
   border-radius: 4px;
+}
+
+:global(.billing-confirm-box .el-message-box__btns) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+:global(.billing-confirm-box .el-message-box__btns::before) {
+  content: var(--billing-confirm-tip);
+  margin-right: auto;
+  color: #dc2626;
+  font-size: 15px;
+  font-weight: 900;
 }
 
 .config-section {

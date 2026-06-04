@@ -241,6 +241,11 @@ const prompts = ref(defaultQuestionTexts.map((text, index) => createPrompt(text,
 
 const totalPrompts = computed(() => prompts.value.length)
 
+const MODEL_UNIT_PRICE = 0.1
+const DEFAULT_MODEL_COUNT = 6
+const DEFAULT_DAILY_TIMES = 2
+const estimatedDailyCost = computed(() => (totalPrompts.value * DEFAULT_MODEL_COUNT * DEFAULT_DAILY_TIMES * MODEL_UNIT_PRICE).toFixed(2))
+
 const countedCategories = computed(() => {
   return categories.value.map((category) => ({
     ...category,
@@ -269,16 +274,28 @@ async function handleEditSave() {
     return
   }
   try {
+    setBillingConfirmTip(estimatedDailyCost.value)
     await ElMessageBox.confirm('保存后会立即生效，是否确认保存当前问题配置？', '保存确认', {
       confirmButtonText: '确认保存',
       cancelButtonText: '取消',
-      type: 'warning'
+      type: 'warning',
+      customClass: 'billing-confirm-box'
     })
     editing.value = false
     ElMessage.success('问题配置已保存')
   } catch (error) {
     // 取消保存时继续停留在编辑状态
+  } finally {
+    clearBillingConfirmTip()
   }
+}
+
+const setBillingConfirmTip = (amount) => {
+  document.documentElement.style.setProperty('--billing-confirm-tip', `"预计单天消耗：¥${amount}"`)
+}
+
+const clearBillingConfirmTip = () => {
+  document.documentElement.style.removeProperty('--billing-confirm-tip')
 }
 
 function handleCategoryCommand(command) {
@@ -346,6 +363,8 @@ function deleteSelected() {
 .page-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; margin-bottom: 14px; border-bottom: 1px solid #1f2937; }
 .page-title { font-size: 20px; font-weight: 700; }
 .edit-btn { min-width: 72px; }
+:global(.billing-confirm-box .el-message-box__btns) { display: flex; align-items: center; gap: 10px; }
+:global(.billing-confirm-box .el-message-box__btns::before) { content: var(--billing-confirm-tip); margin-right: auto; color: #dc2626; font-size: 15px; font-weight: 900; }
 .question-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 18px; align-items: stretch; }
 .category-panel, .prompt-panel { border: 1px solid #e5e7eb; border-radius: 4px; background: #fff; min-height: 500px; min-width: 0; box-sizing: border-box; }
 .category-panel { padding: 18px; }

@@ -321,7 +321,11 @@
 
       <template #footer>
         <div class="dialog-footer">
-          <span class="billing-cost-tip">基础模型费用消耗: ¥0.10/问题/次/模型</span>
+          <span class="billing-cost-rule">基础调用、深度思考、截图均按 ¥0.10/问题/次/模型计费</span>
+          <div class="billing-estimate-tip">
+            <span>预计单天消耗</span>
+            <span class="billing-cost-amount">¥{{ estimatedDailyCost }}</span>
+          </div>
           <el-button @click="createDialogVisible = false">取消</el-button>
           <el-button type="primary" @click="saveCreateProject">保存</el-button>
         </div>
@@ -532,6 +536,23 @@ const filteredQuestions = computed(() => {
   const keyword = questionSearch.value.trim()
   if (!keyword) return createForm.questions
   return createForm.questions.filter(item => item.text.includes(keyword))
+})
+
+const MODEL_UNIT_PRICE = 0.1
+
+const estimatedDailyCost = computed(() => {
+  const questionCount = createForm.questions.length
+  const dailyTimes = Number(createForm.monitor.dailyTimes) || 0
+  const enabledModels = createForm.models.filter(item => item.enabled)
+  const baseUnits = questionCount * dailyTimes * enabledModels.length
+  const enhancedUnits = createForm.collectChannel === 'enhanced'
+    ? enabledModels.reduce((total, model) => {
+      const deepThinkingUnits = model.deepThinking ? 1 : 0
+      const screenshotUnits = model.allScreenshot || model.mentionScreenshot ? 1 : 0
+      return total + questionCount * dailyTimes * (deepThinkingUnits + screenshotUnits)
+    }, 0)
+    : 0
+  return ((baseUnits + enhancedUnits) * MODEL_UNIT_PRICE).toFixed(2)
 })
 
 const handleSearch = () => { console.log('查询条件:', searchForm) }
@@ -992,8 +1013,10 @@ const saveCreateProject = async () => {
 .model-children { margin-top: 12px; padding-top: 10px; border-top: 1px solid #bfdbfe; display: flex; flex-direction: column; gap: 8px; }
 .model-children :deep(.el-checkbox) { margin-right: 0; }
 .screenshot-checks { display: flex; gap: 14px; flex-wrap: wrap; }
-.dialog-footer { display: flex; justify-content: center; align-items: center; gap: 18px; }
-.billing-cost-tip { color: #64748b; font-size: 13px; white-space: nowrap; }
+.dialog-footer { display: flex; justify-content: flex-end; align-items: center; gap: 18px; width: 100%; }
+.billing-cost-rule { margin-right: auto; color: #94a3b8; font-size: 13px; white-space: nowrap; }
+.billing-estimate-tip { display: flex; align-items: center; gap: 8px; color: #64748b; font-size: 13px; white-space: nowrap; }
+.billing-cost-amount { color: #dc2626; font-size: 18px; font-weight: 900; }
 
 
 .project-name-section {

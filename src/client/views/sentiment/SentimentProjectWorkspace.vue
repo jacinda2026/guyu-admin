@@ -3551,6 +3551,23 @@ const monitorModels = reactive([
   { name: 'Kimi', enabled: true, deepThinking: false, allScreenshot: false, mentionScreenshot: true }
 ])
 
+const MODEL_UNIT_PRICE = 0.1
+const issueEstimatedDailyCost = computed(() => (issuePrompts.value.length * monitorModels.filter(item => item.enabled).length * monitorBasic.askTimes * MODEL_UNIT_PRICE).toFixed(2))
+const monitorEstimatedDailyCost = computed(() => {
+  const questionCount = issuePrompts.value.length
+  const dailyTimes = Number(monitorBasic.askTimes) || 0
+  const enabledModels = monitorModels.filter(item => item.enabled)
+  const baseUnits = questionCount * dailyTimes * enabledModels.length
+  const enhancedUnits = collectChannel.value === 'enhanced'
+    ? enabledModels.reduce((total, model) => {
+      const deepThinkingUnits = model.deepThinking ? 1 : 0
+      const screenshotUnits = model.allScreenshot || model.mentionScreenshot ? 1 : 0
+      return total + questionCount * dailyTimes * (deepThinkingUnits + screenshotUnits)
+    }, 0)
+    : 0
+  return ((baseUnits + enhancedUnits) * MODEL_UNIT_PRICE).toFixed(2)
+})
+
 const monitorAlertRules = reactive({
   riskSourceCount: true,
   riskSourceCountTarget: 10,
@@ -3884,15 +3901,19 @@ const handleIssueEditSave = async () => {
     return
   }
   try {
+    setBillingConfirmTip(issueEstimatedDailyCost.value)
     await ElMessageBox.confirm('保存后会立即影响舆情监控问题采集，是否确认保存？', '保存问题配置', {
       confirmButtonText: '确认保存',
       cancelButtonText: '取消',
-      type: 'warning'
+      type: 'warning',
+      customClass: 'billing-confirm-box'
     })
     issueEditing.value = false
     ElMessage.success('舆情问题配置已保存')
   } catch {
     // 保持编辑态
+  } finally {
+    clearBillingConfirmTip()
   }
 }
 
@@ -4080,10 +4101,12 @@ const handleMonitorEditSave = async () => {
   }
 
   try {
+    setBillingConfirmTip(monitorEstimatedDailyCost.value)
     await ElMessageBox.confirm('保存后会立即影响舆情监控任务的执行计划，是否确认保存当前监控配置？', '确认保存', {
       confirmButtonText: '确认保存',
       cancelButtonText: '取消',
       type: 'warning',
+      customClass: 'billing-confirm-box',
       closeOnClickModal: false,
       closeOnPressEscape: false
     })
@@ -4091,7 +4114,17 @@ const handleMonitorEditSave = async () => {
     ElMessage.success('监控配置已保存')
   } catch {
     // 保持编辑态
+  } finally {
+    clearBillingConfirmTip()
   }
+}
+
+const setBillingConfirmTip = (amount) => {
+  document.documentElement.style.setProperty('--billing-confirm-tip', `"预计单天消耗：¥${amount}"`)
+}
+
+const clearBillingConfirmTip = () => {
+  document.documentElement.style.removeProperty('--billing-confirm-tip')
 }
 
 const handleAlertEditSave = async () => {
@@ -5118,6 +5151,8 @@ const refreshExportJobs = () => {
   height: 40px;
   border-radius: 4px;
 }
+:global(.billing-confirm-box .el-message-box__btns) { display: flex; align-items: center; gap: 10px; }
+:global(.billing-confirm-box .el-message-box__btns::before) { content: var(--billing-confirm-tip); margin-right: auto; color: #dc2626; font-size: 15px; font-weight: 900; }
 .monitor-config-section {
   margin-bottom: 44px;
 }
