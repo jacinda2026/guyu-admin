@@ -62,10 +62,6 @@
             <el-option label="定时任务" value="schedule" />
             <el-option label="复测任务" value="retest" />
           </el-select>
-          <el-button type="primary" size="small" @click="openManualReportDialog">
-            <el-icon><Timer /></el-icon>
-            生成报告
-          </el-button>
         </div>
       </div>
 
@@ -109,13 +105,18 @@
             <span class="section-title">监控报告</span>
             <span class="section-subtitle">报告保存 30 天，生成后请尽快下载</span>
           </div>
-          <el-select v-model="reportTypeFilter" size="small" style="width: 140px">
-            <el-option label="全部报告类型" value="all" />
-            <el-option label="日报" value="daily" />
-            <el-option label="周报" value="weekly" />
-            <el-option label="月报" value="monthly" />
-            <el-option label="自定义时间段" value="custom" />
-          </el-select>
+          <div class="report-header-actions">
+            <el-select v-model="reportTypeFilter" size="small" style="width: 140px">
+              <el-option label="报告类型" value="all" />
+              <el-option label="日报" value="daily" />
+              <el-option label="周报" value="weekly" />
+              <el-option label="月报" value="monthly" />
+              <el-option label="自定义时间段" value="custom" />
+            </el-select>
+            <el-button type="primary" class="create-report-btn" @click="openManualReportDialog">
+              生成报告
+            </el-button>
+          </div>
         </div>
       </template>
       <el-table :data="filteredReports" class="report-table" style="width: 100%" :header-cell-style="headerCellStyle">
@@ -1455,6 +1456,14 @@ const handleExportReport = (type, row) => {
 .fail-text { color: #dc2626; font-weight: 700; }
 .report-name-cell { color: #1f2937; font-weight: 700; }
 .report-summary { margin-left: 8px; color: #64748b; font-size: 13px; }
+.report-header-actions { display: flex; align-items: center; gap: 10px; }
+.create-report-btn {
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 7px;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, .22);
+}
 .manual-report-form { padding-top: 2px; }
 .manual-report-form :deep(.el-form-item) { margin-bottom: 18px; }
 .manual-report-form :deep(.el-form-item__label) { padding-bottom: 8px; color: #111827; font-weight: 800; }
