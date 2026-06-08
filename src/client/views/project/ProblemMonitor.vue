@@ -9,7 +9,7 @@
         <el-button text type="primary" @click="backToList">返回问题监控</el-button>
       </div>
 
-      <el-row :gutter="14" class="summary-row">
+      <el-row v-if="!hasRelatedQuestionFilter" :gutter="14" class="summary-row">
         <el-col v-for="item in tagDetailCards" :key="item.label" :span="6">
           <div class="summary-card">
             <span class="metric-title">
@@ -102,11 +102,15 @@
     </template>
 
     <template v-else-if="!isDetailPage">
-      <div class="page-toolbar">
+      <div v-if="hasRelatedQuestionFilter" class="source-related-header">
         <div>
-          <h2>问题监控</h2>
-          <p>按监控问题维度汇总提问次数、提及率、推荐顺位、回答质量和标签分布。</p>
+          <h2>文章关联问题列表</h2>
+          <p>当前展示「{{ relatedSourceTitle || '该文章' }}」下关联的监控问题。</p>
         </div>
+        <el-button text type="primary" @click="backToSourceManagement">返回我的信源</el-button>
+      </div>
+
+      <div v-if="!hasRelatedQuestionFilter" class="page-toolbar">
         <div class="toolbar-actions">
           <el-input v-model="keyword" clearable placeholder="搜索监控问题 / 标签 / 品牌" :prefix-icon="Search" class="search-input" />
           <el-button plain><el-icon><Download /></el-icon>导出</el-button>
@@ -114,7 +118,7 @@
         </div>
       </div>
 
-      <el-row :gutter="14" class="summary-row">
+      <el-row v-if="!hasRelatedQuestionFilter" :gutter="14" class="summary-row">
         <el-col v-for="item in summaryCards" :key="item.label" :span="6">
           <div class="summary-card">
             <span class="metric-title">
@@ -129,30 +133,30 @@
         </el-col>
       </el-row>
 
-      <el-row :gutter="14" class="top-list-row">
+      <el-row v-if="!hasRelatedQuestionFilter" :gutter="14" class="top-list-row">
         <el-col :span="12">
           <el-card shadow="never" class="top-list-card">
-            <template #header><strong>本品提及率高的问题 TOP10</strong></template>
+            <template #header><span class="top-list-title">本品提及率高的问题 TOP10</span></template>
             <div v-for="(item, index) in mentionTopQuestions" :key="item.id" class="top-list-item">
               <span class="rank-no">{{ index + 1 }}</span>
               <button type="button" class="top-question" @click="goToQuestion(item)">{{ item.question }}</button>
-              <strong class="top-value">{{ item.mentionRate }}%</strong>
+              <span class="top-value">{{ item.mentionRate }}%</span>
             </div>
           </el-card>
         </el-col>
         <el-col :span="12">
           <el-card shadow="never" class="top-list-card">
-            <template #header><strong>平均顺位靠前的问题 TOP10</strong></template>
+            <template #header><span class="top-list-title">平均顺位靠前的问题 TOP10</span></template>
             <div v-for="(item, index) in rankTopQuestions" :key="item.id" class="top-list-item">
               <span class="rank-no">{{ index + 1 }}</span>
               <button type="button" class="top-question" @click="goToQuestion(item)">{{ item.question }}</button>
-              <strong class="top-value">{{ item.avgRank }}</strong>
+              <span class="top-value">{{ item.avgRank }}</span>
             </div>
           </el-card>
         </el-col>
       </el-row>
 
-      <el-card shadow="never" class="tag-metric-card">
+      <el-card v-if="!hasRelatedQuestionFilter" shadow="never" class="tag-metric-card">
         <template #header><strong>标签维度数据</strong></template>
         <el-table :data="tagMetrics" size="small" style="width: 100%" :header-cell-style="headerCellStyle" :cell-style="cellStyle">
           <el-table-column prop="tag" label="标签" min-width="150">
@@ -177,15 +181,15 @@
         <div class="table-title-row">
           <div>
             <h3>监控问题列表明细</h3>
-            <p>一行代表一个监控问题，每个问题只归属一个真实问题标签。</p>
+            <p v-if="!hasRelatedQuestionFilter">一行代表一个监控问题，每个问题只归属一个真实问题标签。</p>
           </div>
-          <el-button v-if="editing" type="primary" plain @click="handleAddQuestion">
+          <el-button v-if="editing && !hasRelatedQuestionFilter" type="primary" plain @click="handleAddQuestion">
             <el-icon><Plus /></el-icon>添加监控问题
           </el-button>
         </div>
 
         <el-table :data="pagedQuestions" class="monitor-table" row-key="id" style="width: 100%" :header-cell-style="headerCellStyle" :cell-style="cellStyle">
-          <el-table-column v-if="editing" type="selection" width="42" />
+          <el-table-column v-if="editing && !hasRelatedQuestionFilter" type="selection" width="42" />
           <el-table-column label="序号" width="64" align="center">
             <template #default="{ $index }">{{ (page - 1) * pageSize + $index + 1 }}</template>
           </el-table-column>
@@ -230,7 +234,7 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="108" align="center" fixed="right">
+          <el-table-column v-if="!hasRelatedQuestionFilter" label="操作" width="108" align="center" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" @click="goToQuestion(row)">详情</el-button>
               <el-button v-if="editing" link type="danger" @click="handleDeleteQuestion(row)">删除</el-button>
@@ -321,7 +325,7 @@ const router = useRouter()
 const keyword = ref('')
 const editing = ref(false)
 const page = ref(1)
-const pageSize = ref(20)
+const pageSize = ref(10)
 
 const mentionTrendRef = ref(null)
 const rankTrendRef = ref(null)
@@ -408,10 +412,43 @@ const tagRankList = computed(() => [...currentTagQuestions.value].sort((a, b) =>
 const mentionTopQuestions = computed(() => [...questions.value].sort((a, b) => b.mentionRate - a.mentionRate).slice(0, 10))
 const rankTopQuestions = computed(() => [...questions.value].sort((a, b) => a.avgRank - b.avgRank).slice(0, 10))
 
+const relatedQuestionFilter = computed(() => {
+  const value = route.query.relatedQuestions
+  if (!value) return []
+  const rawValue = Array.isArray(value) ? value[0] : value
+  try {
+    const parsed = JSON.parse(rawValue)
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : []
+  } catch {
+    return String(rawValue).split('|').map(item => item.trim()).filter(Boolean)
+  }
+})
+const hasRelatedQuestionFilter = computed(() => relatedQuestionFilter.value.length > 0)
+const relatedSourceTitle = computed(() => {
+  const value = route.query.sourceTitle
+  return String(Array.isArray(value) ? value[0] : value || '')
+})
+
+const relatedQuestionRows = computed(() => {
+  const seen = new Set()
+  return relatedQuestionFilter.value.map((question, index) => {
+    const matched = questions.value.find(item => item.question === question || item.question.includes(question) || question.includes(item.question))
+    const row = matched || createQuestion(question, questions.value.length + index)
+    return { ...row, id: matched?.id || `RQ${index + 1}` }
+  }).filter((item) => {
+    if (seen.has(item.question)) return false
+    seen.add(item.question)
+    return true
+  })
+})
+
 const filteredQuestions = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
-  if (!kw) return questions.value
-  return questions.value.filter(item => [item.question, item.tag, ...item.competitorMentions].join(' ').toLowerCase().includes(kw))
+  const baseList = hasRelatedQuestionFilter.value ? relatedQuestionRows.value : questions.value
+  return baseList.filter(item => {
+    const matchKeyword = !kw || [item.question, item.tag, ...item.competitorMentions].join(' ').toLowerCase().includes(kw)
+    return matchKeyword
+  })
 })
 const pagedQuestions = computed(() => filteredQuestions.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
 
@@ -449,6 +486,7 @@ const cellStyle = { borderColor: '#eef2f7' }
 
 const handlePageSizeChange = () => { page.value = 1 }
 const goToQuestion = row => router.push(`/project/${route.params.id}/monitor/${row.id}`)
+const backToSourceManagement = () => router.push({ name: 'ConfigSource', params: { id: route.params.id } })
 const backToList = () => router.push(`/project/${route.params.id}/monitor`)
 const viewTagDetail = row => router.push({ path: `/project/${route.params.id}/monitor`, query: { tag: row.tag } })
 const handleEditSave = () => { editing.value = !editing.value; ElMessage.success(editing.value ? '已进入编辑状态' : '已保存监控问题配置') }
@@ -524,6 +562,7 @@ const scheduleRenderCharts = async () => {
 }
 watch(() => route.params.questionId, scheduleRenderCharts)
 watch(() => route.query.tag, scheduleRenderCharts)
+watch(() => route.query.relatedQuestions, () => { page.value = 1 })
 watch(questions, scheduleRenderCharts, { deep: true })
 watch(filteredQuestions, () => { page.value = 1 })
 onMounted(() => {
@@ -538,10 +577,11 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .problem-monitor-page { min-height: 100%; color: #111827; }
-.page-toolbar, .detail-header, .table-title-row, .toolbar-actions, .pagination-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.page-toolbar, .detail-header, .source-related-header, .table-title-row, .toolbar-actions, .pagination-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .page-toolbar { margin-bottom: 12px; }
-.page-toolbar h2, .detail-header h2 { margin: 0; font-size: 22px; font-weight: 800; }
-.page-toolbar p, .detail-header p, .table-title-row p { margin: 5px 0 0; color: #8a95a6; font-size: 13px; }
+.source-related-header { margin-bottom: 14px; padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
+.page-toolbar h2, .detail-header h2, .source-related-header h2 { margin: 0; font-size: 22px; font-weight: 800; }
+.page-toolbar p, .detail-header p, .source-related-header p, .table-title-row p { margin: 5px 0 0; color: #8a95a6; font-size: 13px; }
 .search-input { width: 260px; }
 .summary-row, .top-list-row, .chart-row, .tag-metric-card { margin-bottom: 14px; }
 .summary-card { height: 96px; padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; box-sizing: border-box; }
@@ -560,13 +600,15 @@ onBeforeUnmount(() => {
 .metric-pill { min-width: 72px; padding: 5px 8px; border-radius: 999px; background: #f8fafc; color: #475569; font-size: 12px; font-weight: 800; text-align: center; }
 .metric-pill.is-good { background: #ecfdf5; color: #047857; }
 .metric-pill.is-risk { background: #fff7ed; color: #c2410c; }
-.top-list-card { height: 418px; }
+.top-list-card { height: auto; overflow: visible; }
+.top-list-title { font-weight: 400; }
 .top-list-item { display: grid; grid-template-columns: 32px 1fr 64px; align-items: center; gap: 10px; min-height: 34px; padding: 7px 0; border-bottom: 1px solid #f1f5f9; }
 .top-list-item:last-child { border-bottom: 0; }
 .rank-no { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: #eff6ff; color: #2563eb; font-size: 12px; font-weight: 800; }
-.top-question { min-width: 0; padding: 0; border: 0; background: transparent; color: #334155; font-size: 13px; font-weight: 700; text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.top-list-card .rank-no { font-weight: 400; }
+.top-question { min-width: 0; padding: 0; border: 0; background: transparent; color: #334155; font-size: 13px; font-weight: 400; text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .top-question:hover { color: #2563eb; }
-.top-value { text-align: right; color: #111827; font-size: 14px; }
+.top-value { text-align: right; color: #111827; font-size: 14px; font-weight: 400; }
 .table-title-row { margin-bottom: 12px; }
 .table-title-row h3 { margin: 0; color: #111827; font-size: 16px; font-weight: 800; }
 .monitor-table { border: 1px solid #eef2f7; border-bottom: 0; }

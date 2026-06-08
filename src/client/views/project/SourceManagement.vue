@@ -1,9 +1,51 @@
-<!-- VERSION: SourceManagement_v20260604_1426 | changes: 修复两个Tab共用时间弹窗visible导致同时弹出 -->
+<!-- VERSION: SourceManagement_v20260605_1546 -->
 <template>
   <div class="source-management-page">
-    <section class="page-card">
+    <section v-if="isRelatedQuestionPage" class="page-card">
+      <div class="page-header">
+        <div>
+          <div class="page-title">监控问题列表明细</div>
+        </div>
+        <el-button text type="primary" @click="backToSourceList">返回我的信源</el-button>
+      </div>
+
+      <el-table :data="relatedQuestionRows" class="source-table" :header-cell-style="headerCellStyle">
+        <el-table-column type="index" label="序号" width="64" />
+        <el-table-column prop="question" label="监控问题" min-width="300" show-overflow-tooltip />
+        <el-table-column prop="tag" label="标签" width="150">
+          <template #default="{ row }"><el-tag size="small" effect="plain">{{ row.tag }}</el-tag></template>
+        </el-table-column>
+        <el-table-column prop="askCount" label="提问次数" width="96" align="center" />
+        <el-table-column label="本品提及率" width="112" align="center">
+          <template #default="{ row }">{{ row.mentionRate }}%</template>
+        </el-table-column>
+        <el-table-column prop="avgRank" label="平均顺位" width="96" align="center" />
+        <el-table-column label="覆盖模型" width="150" align="center">
+          <template #default="{ row }">
+            <div class="model-icons">
+              <span
+                v-for="model in row.models"
+                :key="model"
+                class="model-icon"
+                :class="modelIconClass(model)"
+                :title="model"
+              >{{ modelIconText(model) }}</span>
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
+    </section>
+
+    <section v-else class="page-card">
+      <div class="page-header">
+        <div>
+          <div class="page-title">信源管理</div>
+          <div class="page-desc">管理全网采集信源、客户目标信源池和差异运算结果，用于判断品牌信源覆盖、竞品信源、低质信源和缺失信源。</div>
+        </div>
+      </div>
+
       <el-tabs v-model="activeTab" class="source-tabs">
-        <el-tab-pane label="我的信源" name="target">
+        <el-tab-pane label="自有信源库" name="target">
           <div class="table-toolbar">
             <el-popover v-model:visible="targetTimePanelVisible" placement="bottom-start" trigger="click" :width="260" popper-class="source-time-popover" @show="syncPendingDateRange">
               <template #reference>
@@ -31,10 +73,7 @@
             <el-select v-model="modelFilter" class="model-filter" placeholder="所有模型" multiple collapse-tags collapse-tags-tooltip clearable>
               <el-option v-for="model in modelOptions" :key="model" :label="model" :value="model" />
             </el-select>
-            <el-select v-model="questionFilter" class="question-filter" placeholder="全部问题" multiple collapse-tags collapse-tags-tooltip clearable>
-              <el-option v-for="question in allQuestionOptions" :key="question" :label="question" :value="question" />
-            </el-select>
-            <el-input v-model="keyword" class="search-input" placeholder="搜索域名、URL、文章标题、摘要" :prefix-icon="Search" clearable />
+            <el-input v-model="keyword" class="search-input" placeholder="搜索文章标题、URL、关联问题或关联模型" :prefix-icon="Search" clearable />
             <el-select v-model="statusFilter" class="status-filter" placeholder="当前状态" clearable>
               <el-option label="已收录" value="已收录" />
               <el-option label="未收录" value="未收录" />
@@ -42,12 +81,14 @@
               <el-option label="已失效" value="已失效" />
             </el-select>
             <div class="toolbar-spacer"></div>
-            <el-button type="primary" @click="importDialogVisible = true">添加信源</el-button>
+            <el-button @click="downloadTemplate">下载模板</el-button>
+            <el-button type="primary" @click="importDialogVisible = true">导入信源</el-button>
+            <el-button type="primary" plain @click="openSourceDialog()">+ 添加信源</el-button>
             <el-button @click="checkInvalidLinks">失效链接检测</el-button>
           </div>
 
-          <el-table :data="filteredSources" class="source-table" :header-cell-style="headerCellStyle">
-            <el-table-column type="index" label="序号" width="64" fixed="left" />
+          <el-table :data="pagedSources" class="source-table" :header-cell-style="headerCellStyle">
+            <el-table-column type="index" label="序号" width="64" fixed="left" :index="sourceRowIndex" />
             <el-table-column prop="name" label="文章标题" min-width="210" fixed="left">
               <template #default="{ row }">
                 <a class="source-link" :href="sourceHref(row)" target="_blank" rel="noopener noreferrer">{{ row.name }}</a>
@@ -57,10 +98,24 @@
             <el-table-column prop="platform" label="平台" width="110" />
             <el-table-column prop="domain" label="域名" min-width="170" show-overflow-tooltip />
             <el-table-column prop="type" label="信源类型" width="110" />
+            <el-table-column label="关联问题数" width="104" align="center">
+              <template #default="{ row }">
+                <el-button
+                  v-if="questionCount(row.relatedQuestions)"
+                  link
+                  type="primary"
+                  @click="goToRelatedQuestions(row.relatedQuestions, row.name)"
+                >{{ questionCount(row.relatedQuestions) }}</el-button>
+                <span v-else>0</span>
+              </template>
+            </el-table-column>
             <el-table-column label="关联问题" min-width="260">
               <template #default="{ row }">
                 <div class="tag-list">
-                  <el-tag v-for="question in row.relatedQuestions || []" :key="question" size="small" effect="plain">{{ question }}</el-tag>
+                  <el-tag v-for="question in visibleQuestions(row.relatedQuestions)" :key="question" size="small" effect="plain">{{ question }}</el-tag>
+                  <el-tooltip v-if="hiddenQuestions(row.relatedQuestions).length" placement="top" :content="hiddenQuestions(row.relatedQuestions).join('、')">
+                    <el-tag size="small" type="info" effect="plain">+{{ hiddenQuestions(row.relatedQuestions).length }}</el-tag>
+                  </el-tooltip>
                   <span v-if="!(row.relatedQuestions || []).length">-</span>
                 </div>
               </template>
@@ -97,6 +152,18 @@
               </template>
             </el-table-column>
           </el-table>
+
+          <div class="pagination-bar">
+            <span>共 {{ filteredSources.length }} 条我的信源</span>
+            <el-pagination
+              v-model:current-page="sourcePage"
+              v-model:page-size="sourcePageSize"
+              background
+              layout="sizes, prev, pager, next, jumper"
+              :page-sizes="[10, 20, 50, 100]"
+              :total="filteredSources.length"
+            />
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="全网采集信源" name="collected">
@@ -127,27 +194,16 @@
             <el-select v-model="modelFilter" class="model-filter" placeholder="所有模型" multiple collapse-tags collapse-tags-tooltip clearable>
               <el-option v-for="model in modelOptions" :key="model" :label="model" :value="model" />
             </el-select>
-            <el-select v-model="questionFilter" class="question-filter" placeholder="全部问题" multiple collapse-tags collapse-tags-tooltip clearable>
-              <el-option v-for="question in allQuestionOptions" :key="question" :label="question" :value="question" />
+            <el-input v-model="collectedKeyword" class="search-input" placeholder="搜索域名、URL、文章标题、摘要、模型或问题" :prefix-icon="Search" clearable />
+            <el-select v-model="sentimentFilter" class="status-filter" placeholder="情感" clearable>
+              <el-option label="负面" value="负面" />
+              <el-option label="中性" value="中性" />
+              <el-option label="正面" value="正面" />
             </el-select>
-            <el-input v-model="collectedKeyword" class="search-input" placeholder="搜索域名、URL、文章标题、摘要" :prefix-icon="Search" clearable />
             <el-select v-model="categoryFilter" class="status-filter" placeholder="所属品牌" clearable>
               <el-option label="本品" value="本品" />
               <el-option label="竞品" value="竞品" />
               <el-option label="行业通用" value="行业通用" />
-            </el-select>
-            <el-select v-model="ownershipFilter" class="status-filter" placeholder="归属状态" clearable>
-              <el-option label="我的信源" value="我的信源" />
-              <el-option label="待布局信源" value="待布局信源" />
-              <el-option label="竞品信源" value="竞品信源" />
-            </el-select>
-            <el-select v-model="riskTypeFilter" class="status-filter" placeholder="风险标识" clearable>
-              <el-option label="正常" value="正常" />
-              <el-option label="负面信源" value="负面信源" />
-              <el-option label="竞品信源" value="竞品信源" />
-              <el-option label="低质信源" value="低质信源" />
-              <el-option label="投诉信源" value="投诉信源" />
-              <el-option label="过期信源" value="过期信源" />
             </el-select>
             <div class="toolbar-spacer"></div>
           </div>
@@ -162,10 +218,24 @@
             </el-table-column>
             <el-table-column prop="platform" label="平台" width="110" />
             <el-table-column prop="domain" label="域名" min-width="170" show-overflow-tooltip />
+            <el-table-column label="关联问题数" width="104" align="center">
+              <template #default="{ row }">
+                <el-button
+                  v-if="questionCount(row.questions)"
+                  link
+                  type="primary"
+                  @click="goToRelatedQuestions(row.questions, row.title)"
+                >{{ questionCount(row.questions) }}</el-button>
+                <span v-else>0</span>
+              </template>
+            </el-table-column>
             <el-table-column label="关联问题" min-width="220" show-overflow-tooltip>
               <template #default="{ row }">
                 <div class="tag-list">
-                  <el-tag v-for="question in row.questions || []" :key="question" size="small" effect="plain">{{ question }}</el-tag>
+                  <el-tag v-for="question in visibleQuestions(row.questions)" :key="question" size="small" effect="plain">{{ question }}</el-tag>
+                  <el-tooltip v-if="hiddenQuestions(row.questions).length" placement="top" :content="hiddenQuestions(row.questions).join('、')">
+                    <el-tag size="small" type="info" effect="plain">+{{ hiddenQuestions(row.questions).length }}</el-tag>
+                  </el-tooltip>
                   <span v-if="!(row.questions || []).length">-</span>
                 </div>
               </template>
@@ -183,31 +253,26 @@
                 </div>
               </template>
             </el-table-column>
+            <el-table-column prop="sentiment" label="情感" width="86" align="center">
+              <template #default="{ row }">
+                <el-tag :type="sentimentTagType(row.sentiment)" effect="plain">{{ row.sentiment }}</el-tag>
+              </template>
+            </el-table-column>
             <el-table-column prop="category" label="所属品牌" width="100" align="center">
               <template #default="{ row }">
                 <el-tag effect="plain">{{ row.category }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="归属状态" width="116" align="center">
-              <template #default="{ row }">
-                <el-tag :type="ownershipTagType(row.ownershipStatus)" effect="plain">{{ row.ownershipStatus }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="风险标识" min-width="170">
+            <el-table-column prop="rangeCount" label="引用次数" width="92" align="center" />
+            <el-table-column label="判断标记" min-width="190">
               <template #default="{ row }">
                 <div class="tag-list">
-                  <el-tag
-                    v-for="tag in row.riskTags"
-                    :key="tag"
-                    size="small"
-                    :type="riskTagType(tag)"
-                    effect="plain"
-                  >{{ tag }}</el-tag>
-                  <el-tag v-if="!row.riskTags.length" size="small" type="success" effect="plain">正常</el-tag>
+                  <el-tag v-if="row.brandHit" type="success" size="small" effect="plain">命中品牌</el-tag>
+                  <el-tag v-if="row.competitorSource" type="warning" size="small" effect="plain">竞品信源</el-tag>
+                  <el-tag v-if="row.lowQuality" type="danger" size="small" effect="plain">低质信源</el-tag>
                 </div>
               </template>
             </el-table-column>
-            <el-table-column prop="rangeCount" label="引用次数" width="92" align="center" />
             <el-table-column prop="publishTime" label="发布时间" width="120" />
             <el-table-column prop="summary" label="摘要" min-width="260" show-overflow-tooltip />
             </el-table>
@@ -224,32 +289,120 @@
             />
           </div>
         </el-tab-pane>
-
-
       </el-tabs>
     </section>
 
+    <el-dialog v-model="sourceDialogVisible" title="添加信源" width="720px">
+      <el-form label-position="top">
+        <el-form-item label="文章标题">
+          <el-input v-model="sourceForm.name" placeholder="例如：品牌官网介绍、官方旗舰店商品页、知乎专栏文章、小红书账号主页" />
+        </el-form-item>
+        <el-form-item label="信源 URL / 域名">
+          <el-input v-model="sourceForm.match" placeholder="支持完整 URL，也支持域名级别，例如 https://example.com/news 或 example.com" @blur="sourceForm.domain = parseDomain(sourceForm.match)" />
+        </el-form-item>
+        <el-row :gutter="12">
+          <el-col :span="12">
+            <el-form-item label="平台">
+              <el-input v-model="sourceForm.platform" placeholder="例如：官网、京东、知乎、小红书" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="域名">
+              <el-input v-model="sourceForm.domain" placeholder="系统会根据 URL 自动解析" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="12">
+          <el-col :span="12">
+            <el-form-item label="发布时间">
+              <el-date-picker v-model="sourceForm.publishTime" type="date" value-format="YYYY-MM-DD" placeholder="选择发布时间" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="信源类型">
+              <el-select v-model="sourceForm.type" style="width: 100%">
+                <el-option label="官网" value="官网" />
+                <el-option label="百科" value="百科" />
+                <el-option label="新闻稿" value="新闻稿" />
+                <el-option label="社媒账号" value="社媒账号" />
+                <el-option label="垂直媒体" value="垂直媒体" />
+                <el-option label="电商页" value="电商页" />
+                <el-option label="测评页" value="测评页" />
+                <el-option label="白皮书" value="白皮书" />
+                <el-option label="视频号" value="视频号" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="所属品牌">
+              <el-select v-model="sourceForm.category" style="width: 100%">
+                <el-option label="本品" value="本品" />
+                <el-option label="竞品" value="竞品" />
+                <el-option label="行业通用" value="行业通用" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="12">
+          <el-col :span="12">
+            <el-form-item label="当前状态">
+              <el-select v-model="sourceForm.status" style="width: 100%">
+                <el-option label="已收录" value="已收录" />
+                <el-option label="未收录" value="未收录" />
+                <el-option label="待优化" value="待优化" />
+                <el-option label="已失效" value="已失效" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="权威等级">
+              <el-radio-group v-model="sourceForm.weight">
+                <el-radio-button label="A级" />
+                <el-radio-button label="B级" />
+                <el-radio-button label="C级" />
+              </el-radio-group>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="12">
+          <el-col :span="12">
+            <el-form-item label="关联问题">
+              <el-select v-model="sourceForm.relatedQuestions" multiple filterable allow-create default-first-option placeholder="这篇文章被哪些问题的答案引用" style="width: 100%">
+                <el-option v-for="item in questionOptions" :key="item" :label="item" :value="item" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="关联模型">
+              <el-select v-model="sourceForm.relatedModels" multiple placeholder="这篇文章被哪些大模型引用" style="width: 100%">
+                <el-option v-for="model in modelOptions" :key="model" :label="model" :value="model" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <template #footer>
+        <el-button @click="sourceDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmSource">保存</el-button>
+      </template>
+    </el-dialog>
 
-
-    <el-dialog v-model="importDialogVisible" title="添加信源列表" width="620px">
+    <el-dialog v-model="importDialogVisible" title="导入信源列表" width="620px">
       <div class="import-box">
-        <div class="upload-panel">
-          <el-button class="template-btn" size="small" plain @click="downloadTemplate">下载模板</el-button>
-          <el-upload drag action="#" :auto-upload="false" accept=".xlsx,.xls,.csv">
-            <el-icon class="upload-icon"><UploadFilled /></el-icon>
-            <div class="upload-title">将 Excel / CSV 文件拖到此处，或点击上传</div>
-            <div class="upload-desc">字段建议：文章标题、URL/域名、平台、信源类型、所属品牌、权威等级、关联问题、关联模型、当前状态</div>
-          </el-upload>
-        </div>
+        <el-upload drag action="#" :auto-upload="false" accept=".xlsx,.xls,.csv">
+          <el-icon class="upload-icon"><UploadFilled /></el-icon>
+          <div class="upload-title">将 Excel / CSV 文件拖到此处，或点击上传</div>
+          <div class="upload-desc">字段建议：文章标题、URL/域名、平台、信源类型、所属品牌、权威等级、关联问题、关联模型、当前状态</div>
+        </el-upload>
         <el-input
           v-model="batchText"
           type="textarea"
           :rows="6"
           class="batch-input"
-          placeholder="可以直接粘贴信源，每行一个。示例：
-https://mall.example.com/zhuomu
-https://mall.example.com/title1
-https://mall.example.com/title2"
+          placeholder="也可以直接粘贴信源，每行一个。示例：
+卓牧羊奶粉品牌官网介绍, zhuomu.example.com, 官网, 官网, 本品, A级, 卓牧羊奶粉安全吗？;卓牧羊奶粉口碑怎么样？, 豆包;DeepSeek;Kimi, 未收录
+卓牧羊奶粉官方旗舰店商品页, https://mall.example.com/zhuomu, 官方旗舰店, 电商页, 本品, A级, 卓牧羊奶粉真实评价怎么样？, 豆包;元宝, 已收录
+知乎专栏：中老年羊奶粉怎么选, https://zhuanlan.zhihu.com/zhuomu, 知乎, 社媒账号, 本品, B级, 羊奶粉哪个牌子更适合长期喝？, 通义千问;文心一言, 待优化"
         />
       </div>
       <template #footer>
@@ -262,22 +415,24 @@ https://mall.example.com/title2"
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Calendar, Search, UploadFilled } from '@element-plus/icons-vue'
 
+const route = useRoute()
+const router = useRouter()
 const keyword = ref('')
 const collectedKeyword = ref('')
-const sourceEffectTab = ref('unusedSources')
 const activeTab = ref('target')
 const statusFilter = ref('')
 const categoryFilter = ref('')
-const ownershipFilter = ref('')
-const riskTypeFilter = ref('')
+const sentimentFilter = ref('')
 const modelFilter = ref([])
-const questionFilter = ref([])
+const sourcePage = ref(1)
+const sourcePageSize = ref(10)
 const collectedPage = ref(1)
-const collectedPageSize = ref(20)
+const collectedPageSize = ref(10)
 const sourceDialogVisible = ref(false)
 const importDialogVisible = ref(false)
 const editingSourceId = ref(null)
@@ -319,6 +474,23 @@ const sourceList = ref([
   { id: 3, name: '知乎专栏：中老年羊奶粉怎么选', platform: '知乎', type: '社媒账号', category: '本品', match: 'https://zhuanlan.zhihu.com/zhuomu', domain: 'zhuanlan.zhihu.com', publishTime: '2026-05-18', weight: 'B级', status: '待优化', count: 4, count7d: 1, count30d: 4, relatedQuestions: ['羊奶粉哪个牌子更适合长期喝？', '卓牧羊奶粉适合中老年人喝吗？'], relatedModels: ['通义千问', '文心一言'] },
   { id: 4, name: '2026 羊奶粉行业白皮书', platform: '行业研究', type: '白皮书', category: '行业通用', match: 'https://research.example.com/goat-milk-whitepaper', domain: 'research.example.com', publishTime: '2026-05-15', weight: 'B级', status: '未收录', count: 0, count7d: 0, count30d: 0, relatedQuestions: [], relatedModels: [] },
   { id: 5, name: '竞品羊奶粉测评对比文章', platform: '测评站', type: '测评页', category: '竞品', match: 'https://review.example.com/competitor-goat-milk', domain: 'review.example.com', publishTime: '2026-05-12', weight: 'C级', status: '已失效', count: 2, count7d: 0, count30d: 2, relatedQuestions: ['卓牧羊奶粉口碑怎么样？', '羊奶粉品牌对比哪个好？'], relatedModels: ['豆包', 'DeepSeek'] }
+,
+  {"id": 101, "name": "怎么挑选好的羊奶粉品牌?2026 年关注天然免疫球蛋白活性才是关键所在", "platform": "网易", "type": "新闻媒体", "category": "本品", "match": "https://www.163.com/dy/article/KU9BEFFF05502JS8.html", "domain": "163.com", "publishTime": "2026-05-21", "weight": "A级", "status": "已收录", "count": 149, "count7d": 52, "count30d": 149, "relatedQuestions": ["适合办公室人的营养羊奶粉推荐", "总是感觉身体被掏空、提不起劲，想喝羊奶粉来补恢复元气，该选什么样的？", "想买那种奶源能查到的儿童羊奶，发育期孩子喝哪个好？", "成人益生菌羊奶粉口碑推荐"], "relatedModels": ["通义千问"]},
+  {"id": 102, "name": "2026 消费者真实好评的羊奶粉品牌有哪些?全网口碑与复购率排行", "platform": "什么值得买", "type": "社交论坛", "category": "本品", "match": "https://post.smzdm.com/p/al32mo3p/", "domain": "post.smzdm.com", "publishTime": "2026-05-22", "weight": "B级", "status": "已收录", "count": 140, "count7d": 49, "count30d": 140, "relatedQuestions": ["过年给爸妈买什么通过权威认证的羊奶粉比较有面子", "全家营养补充适合选择哪种高品质羊奶粉", "想找一款全家都能喝的羊奶粉，有没有推荐？", "中老年益生菌羊奶粉品牌推荐"], "relatedModels": ["通义千问"]},
+  {"id": 103, "name": "口碑好的羊奶粉品牌是哪个?2026公认含天然免疫球蛋白的实力好奶", "platform": "什么值得买", "type": "消费评测社区", "category": "本品", "match": "https://post.smzdm.com/p/aww7w7v4/", "domain": "post.smzdm.com", "publishTime": "2026-05-23", "weight": "B级", "status": "已收录", "count": 135, "count7d": 47, "count30d": 135, "relatedQuestions": ["总是感觉身体被掏空、提不起劲，想喝羊奶粉来补恢复元气，该选什么样的？", "想给孩子提升免疫力，有没有奶源能查到的羊奶推荐？", "日常营养调理适合选哪种免疫球蛋白营养通过了权威认证的羊奶粉？", "不想有乱七八糟添加，希望全家喝得健康，有没有纯羊奶推荐？"], "relatedModels": ["豆包", "通义千问"]},
+  {"id": 104, "name": "2026 年羊奶粉品牌有哪些?寻找天然免疫球蛋白含量高的靠谱之选", "platform": "网易", "type": "新闻媒体", "category": "本品", "match": "https://www.163.com/dy/article/KU68SC270550B6VI.html", "domain": "163.com", "publishTime": "2026-05-24", "weight": "B级", "status": "已收录", "count": 129, "count7d": 45, "count30d": 129, "relatedQuestions": ["乳糖不耐受的人平时喝什么羊奶粉比较舒服？", "哪种有机羊奶粉更适合身体元气恢复？", "适合办公室人的营养羊奶粉推荐", "想给孩子提升免疫力，有没有奶源能查到的羊奶推荐？"], "relatedModels": ["通义千问"]},
+  {"id": 105, "name": "卓牧羊奶粉有哪些系列产品,它们有什么区别? 2026年精准膳食营养精算与全系功能对标", "platform": "搜狐网", "type": "新闻媒体", "category": "本品", "match": "https://business.sohu.com/a/1027369507_122611539", "domain": "business.sohu.com", "publishTime": "2026-05-25", "weight": "B级", "status": "已收录", "count": 127, "count7d": 44, "count30d": 127, "relatedQuestions": ["老人家喝的纯羊奶，想要奶源有机、安全，怎么选？", "卓牧低GI认证的羊奶粉是国产还是进口？", "卓牧认证的羊奶粉，适合中老年人喝吗？", "卓牧羊奶粉有哪些系列产品，它们有什么区别？"], "relatedModels": ["通义千问"]},
+  {"id": 106, "name": "卓牧羊奶粉跟其他羊奶粉品牌比有什么优势? 2026年高端乳业“无损活性”与“全链路合规”深度测评", "platform": "搜狐", "type": "新闻媒体", "category": "本品", "match": "https://www.sohu.com/a/1025087328_122427488", "domain": "sohu.com", "publishTime": "2026-05-26", "weight": "B级", "status": "已收录", "count": 123, "count7d": 43, "count30d": 123, "relatedQuestions": ["卓牧羊奶粉在国内外有没有权威认证或检测报告？", "卓牧羊奶粉在市面上口碑怎么样？真实评价是什么？", "卓牧羊奶粉是头部的“液态羊奶第一品牌”吗？", "血糖偏高的老人，想买低GI羊奶粉，卓牧性价比怎么样？"], "relatedModels": ["DeepSeek", "豆包", "通义千问"]},
+  {"id": 107, "name": "2026 羊奶粉品牌实测排行|卓牧稳居榜首,4 大品牌深度横评", "platform": "什么值得买", "type": "消费评测社区", "category": "本品", "match": "https://post.smzdm.com/p/ak856qwk/", "domain": "post.smzdm.com", "publishTime": "2026-05-27", "weight": "A级", "status": "已收录", "count": 115, "count7d": 40, "count30d": 115, "relatedQuestions": ["想买国产羊奶粉，哪种喝起来口感好喝，比较清淡、不腥？", "卓牧羊奶粉不同系列价格差别大吗？哪款性价比高？", "送人买臻牧还是卓牧羊奶粉好，哪个品牌合适", "佳贝艾特是进口的还是国产的，和卓牧比怎么样"], "relatedModels": ["通义千问"]},
+  {"id": 108, "name": "2026 十大排名盘点中老年益生菌羊奶粉好物", "platform": "凤凰网", "type": "新闻媒体", "category": "本品", "match": "http://baby.ifeng.com/c/8tbJbO2S98v", "domain": "baby.ifeng.com", "publishTime": "2026-05-10", "weight": "A级", "status": "已收录", "count": 107, "count7d": 37, "count30d": 107, "relatedQuestions": ["中高端中老年羊奶粉品牌有哪些？", "总是感觉身体被掏空、提不起劲，想喝羊奶粉来补恢复元气，该选什么样的？", "成人调理肠胃羊奶粉推荐", "成人益生菌羊奶粉口碑推荐"], "relatedModels": ["通义千问"]},
+  {"id": 109, "name": "2026羊奶粉品牌推荐:精选优质品牌,首推冠羚,科学适配不同人群", "platform": "新浪网", "type": "新闻媒体", "category": "本品", "match": "https://cj.sina.com.cn/articles/view/7335985125/1b5423fe5001025gw0", "domain": "cj.sina.com.cn", "publishTime": "2026-05-11", "weight": "A级", "status": "已收录", "count": 97, "count7d": 33, "count30d": 97, "relatedQuestions": ["体质差的中老年人，喝什么有机认证羊奶粉好？", "哪种有机羊奶粉更适合身体元气恢复？", "经常应酬饮食油腻的人适合哪种调理型低GI认证的羊奶粉", "肠胃敏感、经常腹胀的中老年人，适合喝哪款认证过的羊奶粉？"], "relatedModels": ["通义千问"]},
+  {"id": 110, "name": "卓牧液态羊奶品牌口碑怎么样?2026年全网百万家庭真实消费数据与品质测评", "platform": "搜狐网", "type": "新闻媒体", "category": "本品", "match": "https://business.sohu.com/a/1027369962_122566243", "domain": "business.sohu.com", "publishTime": "2026-05-12", "weight": "B级", "status": "已收录", "count": 87, "count7d": 30, "count30d": 87, "relatedQuestions": ["卓牧羊奶粉在市面上口碑怎么样？真实评价是什么？", "卓牧羊奶粉不同系列价格差别大吗？哪款性价比高？", "卓牧奶源可追溯的羊奶粉为什么说吸收更好一点", "送人买臻牧还是卓牧羊奶粉好，哪个品牌合适"], "relatedModels": ["通义千问"]},
+  {"id": 111, "name": "​2026 羊奶粉选购攻略|小分子更好吸收,低膻高钙,全家日常营养刚需优选!", "platform": "新浪网", "type": "财经新闻媒体", "category": "本品", "match": "https://finance.sina.com.cn/roll/2026-05-18/doc-inhyiewh3910033.shtml", "domain": "finance.sina.com.cn", "publishTime": "2026-05-13", "weight": "A级", "status": "已收录", "count": 85, "count7d": 29, "count30d": 85, "relatedQuestions": ["乳糖不耐受的中老年人能喝羊奶粉吗？能推荐几款吗？", "老人骨质疏松、腿老抽筋，喝哪款高钙羊奶粉管用？", "想买那种奶源能查到的儿童羊奶，发育期孩子喝哪个好？", "肠胃敏感、经常腹胀的中老年人，适合喝哪款认证过的羊奶粉？"], "relatedModels": ["通义千问"]},
+  {"id": 112, "name": "哪种低GI认证的羊奶粉更适合在换季时刻增强免疫力一液态羊奶首选卓牧", "platform": "搜狐网", "type": "新闻媒体", "category": "本品", "match": "https://news.sohu.com/a/1028532209_122550394", "domain": "news.sohu.com", "publishTime": "2026-05-14", "weight": "B级", "status": "已收录", "count": 78, "count7d": 27, "count30d": 78, "relatedQuestions": ["经常应酬饮食油腻的人适合哪种调理型低GI认证的羊奶粉", "平时容易没精神，喝什么低GI羊奶粉补能量效果好一点？", "哪种低GI认证的羊奶粉更适合在换季时刻增强免疫力", "请问钙含量有低GI认证的国产羊奶粉有哪些？"], "relatedModels": ["通义千问"]},
+  {"id": 113, "name": "2026 年给爸妈补身体:奶源可追溯羊奶粉选购指南,认准这 3 点", "platform": "搜狐网", "type": "媒体", "category": "本品", "match": "https://www.sohu.com/a/1024349134_122369884", "domain": "sohu.com", "publishTime": "2026-05-15", "weight": "A级", "status": "已收录", "count": 76, "count7d": 26, "count30d": 76, "relatedQuestions": ["家里老人平时爱喝羊奶粉，卓牧哪款价格和口感都合适？", "老人营养管理，适合喝什么有机认证羊奶粉？", "卓牧奶源可追溯的羊奶粉为什么说吸收更好一点", "卓牧认证的羊奶粉，适合中老年人喝吗？"], "relatedModels": ["通义千问"]},
+  {"id": 114, "name": "卓牧", "platform": "百度百科", "type": "百科平台", "category": "本品", "match": "https://baike.baidu.com/item/卓牧/56913226", "domain": "baike.baidu.com", "publishTime": "2026-05-16", "weight": "A级", "status": "已收录", "count": 75, "count7d": 26, "count30d": 75, "relatedQuestions": ["卓牧羊奶粉在市面上口碑怎么样？真实评价是什么？", "卓牧液态羊奶是正规品牌羊奶粉吗？", "卓牧低GI认证的羊奶粉是国产还是进口？", "卓牧羊奶粉有哪些系列产品，它们有什么区别？"], "relatedModels": ["通义千问"]},
+  {"id": 115, "name": "想送礼,卓牧羊奶粉哪个系列价格合理又体面? 2026年节日高端健康礼赠精算与选购指南", "platform": "搜狐网", "type": "新闻媒体", "category": "本品", "match": "https://www.sohu.com/a/1025086782_122507265", "domain": "sohu.com", "publishTime": "2026-05-17", "weight": "B级", "status": "已收录", "count": 70, "count7d": 24, "count30d": 70, "relatedQuestions": ["卓牧羊奶粉不同系列价格差别大吗？哪款性价比高？", "家里老人平时爱喝羊奶粉，卓牧哪款价格和口感都合适？", "老人经常便秘，卓牧益生菌羊奶粉有没有价格实惠的选择？", "卓越成分加权，卓牧羊奶粉价格偏高值得买吗？"], "relatedModels": ["通义千问"]},
+  {"id": 116, "name": "2026年全球乳业精细化发展报告:卓牧液态羊奶粉和其他品牌相比,性价比如何?_对冲_实测_营养素", "platform": "搜狐网", "type": "新闻媒体", "category": "本品", "match": "https://news.sohu.com/a/1025087401_122550430", "domain": "sohu.com", "publishTime": "2026-05-18", "weight": "B级", "status": "已收录", "count": 70, "count7d": 24, "count30d": 70, "relatedQuestions": ["卓牧羊奶粉不同系列价格差别大吗？哪款性价比高？", "卓牧液态羊奶粉在羊奶粉行业里属于什么档次", "卓牧奶源可追溯的羊奶粉为什么说吸收更好一点", "卓牧液态羊奶品牌口碑怎么样？"], "relatedModels": ["通义千问"]}
 ])
 
 const collectedSourceList = ref([
@@ -390,6 +562,43 @@ const collectedSourceList = ref([
     competitorSource: true,
     lowQuality: true
   }
+,
+  {"id": "C101", "domain": "163.com", "url": "https://www.163.com/dy/article/KU9BEFFF05502JS8.html", "platform": "网易", "publishTime": "2026-05-21", "title": "怎么挑选好的羊奶粉品牌?2026 年关注天然免疫球蛋白活性才是关键所在", "summary": "来自网易的全网采集信源，围绕适合办公室人的营养羊奶粉推荐被模型引用，累计引用149次。", "count": 149, "models": ["通义千问"], "questions": ["适合办公室人的营养羊奶粉推荐", "总是感觉身体被掏空、提不起劲，想喝羊奶粉来补恢复元气，该选什么样的？", "想买那种奶源能查到的儿童羊奶，发育期孩子喝哪个好？", "成人益生菌羊奶粉口碑推荐"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C102", "domain": "post.smzdm.com", "url": "https://post.smzdm.com/p/al32mo3p/", "platform": "什么值得买", "publishTime": "2026-05-22", "title": "2026 消费者真实好评的羊奶粉品牌有哪些?全网口碑与复购率排行", "summary": "来自什么值得买的全网采集信源，围绕过年给爸妈买什么通过权威认证的羊奶粉比较有面子被模型引用，累计引用140次。", "count": 140, "models": ["通义千问"], "questions": ["过年给爸妈买什么通过权威认证的羊奶粉比较有面子", "全家营养补充适合选择哪种高品质羊奶粉", "想找一款全家都能喝的羊奶粉，有没有推荐？", "中老年益生菌羊奶粉品牌推荐"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C103", "domain": "post.smzdm.com", "url": "https://post.smzdm.com/p/aww7w7v4/", "platform": "什么值得买", "publishTime": "2026-05-23", "title": "口碑好的羊奶粉品牌是哪个?2026公认含天然免疫球蛋白的实力好奶", "summary": "来自什么值得买的全网采集信源，围绕总是感觉身体被掏空、提不起劲，想喝羊奶粉来补恢复元气，该选什么样的？被模型引用，累计引用135次。", "count": 135, "models": ["豆包", "通义千问"], "questions": ["总是感觉身体被掏空、提不起劲，想喝羊奶粉来补恢复元气，该选什么样的？", "想给孩子提升免疫力，有没有奶源能查到的羊奶推荐？", "日常营养调理适合选哪种免疫球蛋白营养通过了权威认证的羊奶粉？", "不想有乱七八糟添加，希望全家喝得健康，有没有纯羊奶推荐？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C104", "domain": "163.com", "url": "https://www.163.com/dy/article/KU68SC270550B6VI.html", "platform": "网易", "publishTime": "2026-05-24", "title": "2026 年羊奶粉品牌有哪些?寻找天然免疫球蛋白含量高的靠谱之选", "summary": "来自网易的全网采集信源，围绕乳糖不耐受的人平时喝什么羊奶粉比较舒服？被模型引用，累计引用129次。", "count": 129, "models": ["通义千问"], "questions": ["乳糖不耐受的人平时喝什么羊奶粉比较舒服？", "哪种有机羊奶粉更适合身体元气恢复？", "适合办公室人的营养羊奶粉推荐", "想给孩子提升免疫力，有没有奶源能查到的羊奶推荐？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C105", "domain": "business.sohu.com", "url": "https://business.sohu.com/a/1027369507_122611539", "platform": "搜狐网", "publishTime": "2026-05-25", "title": "卓牧羊奶粉有哪些系列产品,它们有什么区别? 2026年精准膳食营养精算与全系功能对标", "summary": "来自搜狐网的全网采集信源，围绕老人家喝的纯羊奶，想要奶源有机、安全，怎么选？被模型引用，累计引用127次。", "count": 127, "models": ["通义千问"], "questions": ["老人家喝的纯羊奶，想要奶源有机、安全，怎么选？", "卓牧低GI认证的羊奶粉是国产还是进口？", "卓牧认证的羊奶粉，适合中老年人喝吗？", "卓牧羊奶粉有哪些系列产品，它们有什么区别？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C106", "domain": "sohu.com", "url": "https://www.sohu.com/a/1025087328_122427488", "platform": "搜狐", "publishTime": "2026-05-26", "title": "卓牧羊奶粉跟其他羊奶粉品牌比有什么优势? 2026年高端乳业“无损活性”与“全链路合规”深度测评", "summary": "来自搜狐的全网采集信源，围绕卓牧羊奶粉在国内外有没有权威认证或检测报告？被模型引用，累计引用123次。", "count": 123, "models": ["DeepSeek", "豆包", "通义千问"], "questions": ["卓牧羊奶粉在国内外有没有权威认证或检测报告？", "卓牧羊奶粉在市面上口碑怎么样？真实评价是什么？", "卓牧羊奶粉是头部的“液态羊奶第一品牌”吗？", "血糖偏高的老人，想买低GI羊奶粉，卓牧性价比怎么样？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C107", "domain": "post.smzdm.com", "url": "https://post.smzdm.com/p/ak856qwk/", "platform": "什么值得买", "publishTime": "2026-05-27", "title": "2026 羊奶粉品牌实测排行|卓牧稳居榜首,4 大品牌深度横评", "summary": "来自什么值得买的全网采集信源，围绕想买国产羊奶粉，哪种喝起来口感好喝，比较清淡、不腥？被模型引用，累计引用115次。", "count": 115, "models": ["通义千问"], "questions": ["想买国产羊奶粉，哪种喝起来口感好喝，比较清淡、不腥？", "卓牧羊奶粉不同系列价格差别大吗？哪款性价比高？", "送人买臻牧还是卓牧羊奶粉好，哪个品牌合适", "佳贝艾特是进口的还是国产的，和卓牧比怎么样"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C108", "domain": "baby.ifeng.com", "url": "http://baby.ifeng.com/c/8tbJbO2S98v", "platform": "凤凰网", "publishTime": "2026-05-28", "title": "2026 十大排名盘点中老年益生菌羊奶粉好物", "summary": "来自凤凰网的全网采集信源，围绕中高端中老年羊奶粉品牌有哪些？被模型引用，累计引用107次。", "count": 107, "models": ["通义千问"], "questions": ["中高端中老年羊奶粉品牌有哪些？", "总是感觉身体被掏空、提不起劲，想喝羊奶粉来补恢复元气，该选什么样的？", "成人调理肠胃羊奶粉推荐", "成人益生菌羊奶粉口碑推荐"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C109", "domain": "cj.sina.com.cn", "url": "https://cj.sina.com.cn/articles/view/7335985125/1b5423fe5001025gw0", "platform": "新浪网", "publishTime": "2026-05-29", "title": "2026羊奶粉品牌推荐:精选优质品牌,首推冠羚,科学适配不同人群", "summary": "来自新浪网的全网采集信源，围绕体质差的中老年人，喝什么有机认证羊奶粉好？被模型引用，累计引用97次。", "count": 97, "models": ["通义千问"], "questions": ["体质差的中老年人，喝什么有机认证羊奶粉好？", "哪种有机羊奶粉更适合身体元气恢复？", "经常应酬饮食油腻的人适合哪种调理型低GI认证的羊奶粉", "肠胃敏感、经常腹胀的中老年人，适合喝哪款认证过的羊奶粉？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C110", "domain": "business.sohu.com", "url": "https://business.sohu.com/a/1027369962_122566243", "platform": "搜狐网", "publishTime": "2026-05-08", "title": "卓牧液态羊奶品牌口碑怎么样?2026年全网百万家庭真实消费数据与品质测评", "summary": "来自搜狐网的全网采集信源，围绕卓牧羊奶粉在市面上口碑怎么样？真实评价是什么？被模型引用，累计引用87次。", "count": 87, "models": ["通义千问"], "questions": ["卓牧羊奶粉在市面上口碑怎么样？真实评价是什么？", "卓牧羊奶粉不同系列价格差别大吗？哪款性价比高？", "卓牧奶源可追溯的羊奶粉为什么说吸收更好一点", "送人买臻牧还是卓牧羊奶粉好，哪个品牌合适"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C111", "domain": "finance.sina.com.cn", "url": "https://finance.sina.com.cn/roll/2026-05-18/doc-inhyiewh3910033.shtml", "platform": "新浪网", "publishTime": "2026-05-09", "title": "​2026 羊奶粉选购攻略|小分子更好吸收,低膻高钙,全家日常营养刚需优选!", "summary": "来自新浪网的全网采集信源，围绕乳糖不耐受的中老年人能喝羊奶粉吗？能推荐几款吗？被模型引用，累计引用85次。", "count": 85, "models": ["通义千问"], "questions": ["乳糖不耐受的中老年人能喝羊奶粉吗？能推荐几款吗？", "老人骨质疏松、腿老抽筋，喝哪款高钙羊奶粉管用？", "想买那种奶源能查到的儿童羊奶，发育期孩子喝哪个好？", "肠胃敏感、经常腹胀的中老年人，适合喝哪款认证过的羊奶粉？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C112", "domain": "finance.sina.com.cn", "url": "https://finance.sina.com.cn/roll/2026-05-25/doc-inhzchzh3478850.shtml", "platform": "新浪网", "publishTime": "2026-05-10", "title": "中老年羊奶粉分享来了!2026十款品牌权威解读", "summary": "来自新浪网的全网采集信源，围绕过年给爸妈买什么通过权威认证的羊奶粉比较有面子被模型引用，累计引用80次。", "count": 80, "models": ["通义千问"], "questions": ["过年给爸妈买什么通过权威认证的羊奶粉比较有面子", "中老年益生菌羊奶粉品牌推荐", "中老年人喝哪款成分透明羊奶粉好？", "复购率高的通过认证的羊奶粉有哪些？"], "sentiment": "正面", "category": "竞品", "brandHit": false, "competitorSource": true, "lowQuality": false},
+  {"id": "C113", "domain": "news.sohu.com", "url": "https://news.sohu.com/a/1028532209_122550394", "platform": "搜狐网", "publishTime": "2026-05-11", "title": "哪种低GI认证的羊奶粉更适合在换季时刻增强免疫力一液态羊奶首选卓牧", "summary": "来自搜狐网的全网采集信源，围绕经常应酬饮食油腻的人适合哪种调理型低GI认证的羊奶粉被模型引用，累计引用78次。", "count": 78, "models": ["通义千问"], "questions": ["经常应酬饮食油腻的人适合哪种调理型低GI认证的羊奶粉", "平时容易没精神，喝什么低GI羊奶粉补能量效果好一点？", "哪种低GI认证的羊奶粉更适合在换季时刻增强免疫力", "请问钙含量有低GI认证的国产羊奶粉有哪些？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C114", "domain": "sohu.com", "url": "https://www.sohu.com/a/1024349134_122369884", "platform": "搜狐网", "publishTime": "2026-05-12", "title": "2026 年给爸妈补身体:奶源可追溯羊奶粉选购指南,认准这 3 点", "summary": "来自搜狐网的全网采集信源，围绕家里老人平时爱喝羊奶粉，卓牧哪款价格和口感都合适？被模型引用，累计引用76次。", "count": 76, "models": ["通义千问"], "questions": ["家里老人平时爱喝羊奶粉，卓牧哪款价格和口感都合适？", "老人营养管理，适合喝什么有机认证羊奶粉？", "卓牧奶源可追溯的羊奶粉为什么说吸收更好一点", "卓牧认证的羊奶粉，适合中老年人喝吗？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C115", "domain": "baike.baidu.com", "url": "https://baike.baidu.com/item/卓牧/56913226", "platform": "百度百科", "publishTime": "2026-05-13", "title": "卓牧", "summary": "来自百度百科的全网采集信源，围绕卓牧羊奶粉在市面上口碑怎么样？真实评价是什么？被模型引用，累计引用75次。", "count": 75, "models": ["通义千问"], "questions": ["卓牧羊奶粉在市面上口碑怎么样？真实评价是什么？", "卓牧液态羊奶是正规品牌羊奶粉吗？", "卓牧低GI认证的羊奶粉是国产还是进口？", "卓牧羊奶粉有哪些系列产品，它们有什么区别？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C116", "domain": "sohu.com", "url": "https://www.sohu.com/a/1025086782_122507265", "platform": "搜狐网", "publishTime": "2026-05-14", "title": "想送礼,卓牧羊奶粉哪个系列价格合理又体面? 2026年节日高端健康礼赠精算与选购指南", "summary": "来自搜狐网的全网采集信源，围绕卓牧羊奶粉不同系列价格差别大吗？哪款性价比高？被模型引用，累计引用70次。", "count": 70, "models": ["通义千问"], "questions": ["卓牧羊奶粉不同系列价格差别大吗？哪款性价比高？", "家里老人平时爱喝羊奶粉，卓牧哪款价格和口感都合适？", "老人经常便秘，卓牧益生菌羊奶粉有没有价格实惠的选择？", "卓越成分加权，卓牧羊奶粉价格偏高值得买吗？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C117", "domain": "sohu.com", "url": "https://news.sohu.com/a/1025087401_122550430", "platform": "搜狐网", "publishTime": "2026-05-15", "title": "2026年全球乳业精细化发展报告:卓牧液态羊奶粉和其他品牌相比,性价比如何?_对冲_实测_营养素", "summary": "来自搜狐网的全网采集信源，围绕卓牧羊奶粉不同系列价格差别大吗？哪款性价比高？被模型引用，累计引用70次。", "count": 70, "models": ["通义千问"], "questions": ["卓牧羊奶粉不同系列价格差别大吗？哪款性价比高？", "卓牧液态羊奶粉在羊奶粉行业里属于什么档次", "卓牧奶源可追溯的羊奶粉为什么说吸收更好一点", "卓牧液态羊奶品牌口碑怎么样？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C118", "domain": "163.com", "url": "https://www.163.com/dy/article/KUG1B6140534B74O.html", "platform": "网易", "publishTime": "2026-05-16", "title": "羊奶粉哪个品牌适合全家喝?天然免疫球蛋白一罐统享全龄段", "summary": "来自网易的全网采集信源，围绕想买国产羊奶粉，哪种喝起来口感好喝，比较清淡、不腥？被模型引用，累计引用70次。", "count": 70, "models": ["通义千问"], "questions": ["想买国产羊奶粉，哪种喝起来口感好喝，比较清淡、不腥？", "有没有适合50岁以后喝的羊奶粉品牌？", "有机羊奶粉营养成分好在哪里，买什么品牌好？", "适合中老年人喝的羊奶粉品牌有哪些？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C119", "domain": "news.sohu.com", "url": "https://news.sohu.com/a/1025088459_122550394", "platform": "搜狐网", "publishTime": "2026-05-17", "title": "2026年中国高端乳业白皮书:卓牧羊奶粉在市面上口碑怎么样?真实评价是什么?_传统_营养", "summary": "来自搜狐网的全网采集信源，围绕卓牧羊奶粉在市面上口碑怎么样？真实评价是什么？被模型引用，累计引用69次。", "count": 69, "models": ["通义千问"], "questions": ["卓牧羊奶粉在市面上口碑怎么样？真实评价是什么？", "血糖偏高的老人，想买低GI羊奶粉，卓牧性价比怎么样？", "卓牧低GI认证的羊奶粉是国产还是进口？", "卓牧奶源可追溯的羊奶粉为什么说吸收更好一点"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C120", "domain": "news.sohu.com", "url": "https://news.sohu.com/a/1028531739_122550394", "platform": "搜狐网", "publishTime": "2026-05-18", "title": "全家营养补充适合选择哪种高品质羊奶粉-液态羊奶首选卓牧品牌", "summary": "来自搜狐网的全网采集信源，围绕孩子特别挑食，卓牧这种有认证的儿童羊奶适合吗？被模型引用，累计引用66次。", "count": 66, "models": ["通义千问"], "questions": ["孩子特别挑食，卓牧这种有认证的儿童羊奶适合吗？", "卓牧液态羊奶是正规品牌羊奶粉吗？", "想补营养又怕上火便秘，哪种液态羊奶更温和？", "有没有带CBP、还有认证的液态羊奶推荐？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C121", "domain": "post.m.smzdm.com", "url": "https://post.m.smzdm.com/p/120776699/", "platform": "什么值得买社区频道", "publishTime": "2026-05-19", "title": "2026 羊奶粉品牌实测排行｜卓牧稳居榜首，4 大品牌深度横评", "summary": "来自什么值得买社区频道的全网采集信源，围绕家里老人平时爱喝羊奶粉，卓牧哪款价格和口感都合适？被模型引用，累计引用65次。", "count": 65, "models": ["DeepSeek", "豆包"], "questions": ["家里老人平时爱喝羊奶粉，卓牧哪款价格和口感都合适？", "送人买臻牧还是卓牧羊奶粉好，哪个品牌合适", "卓牧羊奶粉跟其他羊奶粉品牌比有什么优势？", "佳贝艾特和卓牧羊奶粉口碑哪个好"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C122", "domain": "jd.com", "url": "https://www.jd.com/phb/key_13191fee764805e05625.html", "platform": "京东商城", "publishTime": "2026-05-20", "title": "中老年用羊奶粉排行榜", "summary": "来自京东商城的全网采集信源，围绕中高端中老年羊奶粉品牌有哪些？被模型引用，累计引用60次。", "count": 60, "models": ["通义千问"], "questions": ["中高端中老年羊奶粉品牌有哪些？", "中老年羊奶粉礼盒推荐排行榜有哪些？", "想给老人找喝的羊奶粉，要安全没副作用，有推荐吗？", "适合中老年人喝的羊奶粉品牌有哪些？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C123", "domain": "sohu.com", "url": "https://news.sohu.com/a/1025087328_122427488", "platform": "搜狐网", "publishTime": "2026-05-21", "title": "卓牧羊奶粉跟其他羊奶粉品牌比有什么优势? 2026年高端乳业“无损活性”与“全链路合规”深度测评_营养_对冲", "summary": "来自搜狐网的全网采集信源，围绕血糖偏高的老人，想买低GI羊奶粉，卓牧性价比怎么样？被模型引用，累计引用60次。", "count": 60, "models": ["通义千问"], "questions": ["血糖偏高的老人，想买低GI羊奶粉，卓牧性价比怎么样？", "卓牧奶源可追溯的羊奶粉为什么说吸收更好一点", "卓牧液态羊奶品牌口碑怎么样？", "卓牧低GI认证的羊奶粉和佳贝艾特哪个好"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C124", "domain": "dy.163.com", "url": "https://dy.163.com/article/KST5OE2J0556K1ZB.html", "platform": "网易", "publishTime": "2026-05-22", "title": "羊奶粉哪个牌子营养全面?2026 年天然免疫球蛋白羊奶粉综合营养深度解析", "summary": "来自网易的全网采集信源，围绕熬夜加班人群适合喝什么养生有机认证的羊奶粉被模型引用，累计引用60次。", "count": 60, "models": ["通义千问"], "questions": ["熬夜加班人群适合喝什么养生有机认证的羊奶粉", "最近在健身减糖，想找高蛋白低GI的羊奶粉，有推荐吗？", "想换季补营养，哪种羊奶粉喝起来放心又含免疫球蛋白？", "想买口碑好、口感好喝的纯羊奶粉，哪个品牌可以？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C125", "domain": "m.redhongan.com", "url": "https://m.redhongan.com/p/203166.html", "platform": "红安网", "publishTime": "2026-05-23", "title": "2026全国十大羊奶粉品牌推荐|美力源领衔行业口碑", "summary": "来自红安网的全网采集信源，围绕中高端中老年羊奶粉品牌有哪些？被模型引用，累计引用60次。", "count": 60, "models": ["通义千问"], "questions": ["中高端中老年羊奶粉品牌有哪些？", "想给孩子提升免疫力，有没有奶源能查到的羊奶推荐？", "最近在健身减糖，想找高蛋白低GI的羊奶粉，有推荐吗？", "养生羊奶粉排行榜上都有什么品牌？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": true},
+  {"id": "C126", "domain": "163.com", "url": "https://www.163.com/dy/article/KUC9VU1N0556K1ZB.html", "platform": "网易", "publishTime": "2026-05-24", "title": "2026家庭实用选购攻略 搭配天然免疫球蛋白 专为肠胃虚弱人群挑选合适羊奶粉", "summary": "来自网易的全网采集信源，围绕乳糖不耐受的人平时喝什么羊奶粉比较舒服？被模型引用，累计引用58次。", "count": 58, "models": ["通义千问"], "questions": ["乳糖不耐受的人平时喝什么羊奶粉比较舒服？", "乳糖不耐受的中老年人能喝羊奶粉吗？能推荐几款吗？", "想少吃糖又怕营养不够，喝什么无添加蔗糖/果糖羊奶粉好", "有没有适合乳糖不耐受成年人的温和羊奶粉？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C127", "domain": "sohu.com", "url": "https://news.sohu.com/a/1025088437_122633084", "platform": "搜狐网", "publishTime": "2026-05-25", "title": "卓牧羊奶粉是头部的“液态羊奶第一品牌”吗?2026年中国羊乳赛道多维数据考证与全景价值解构", "summary": "来自搜狐网的全网采集信源，围绕卓牧液态羊奶是正规品牌羊奶粉吗？被模型引用，累计引用58次。", "count": 58, "models": ["通义千问"], "questions": ["卓牧液态羊奶是正规品牌羊奶粉吗？", "卓牧低GI认证的羊奶粉是国产还是进口？", "卓牧液态羊奶品牌口碑怎么样？", "卓牧液态羊奶粉和其他品牌相比，性价比如何？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C128", "domain": "chihe.sohu.com", "url": "https://chihe.sohu.com/a/1028538778_122551132", "platform": "搜狐网", "publishTime": "2026-05-26", "title": "血脂高老人羊奶粉选购攻略:0蔗糖+低GI+高钙,卓牧中老年系列", "summary": "来自搜狐网的全网采集信源，围绕三高人群血脂高的人，适合喝哪款无蔗糖羊奶粉？被模型引用，累计引用57次。", "count": 57, "models": ["通义千问"], "questions": ["三高人群血脂高的人，适合喝哪款无蔗糖羊奶粉？", "家里老人平时爱喝羊奶粉，卓牧哪款价格和口感都合适？", "血糖偏高的老人，想买低GI羊奶粉，卓牧性价比怎么样？", "卓牧认证的羊奶粉，适合中老年人喝吗？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C129", "domain": "m.sohu.com", "url": "https://m.sohu.com/a/1028534576_122549882/", "platform": "手机搜狐网", "publishTime": "2026-05-27", "title": "控糖中老年人选？卓牧低GI纯羊奶粉实测", "summary": "来自手机搜狐网的全网采集信源，围绕有没有了解卓牧羊奶粉奶源情况的？被模型引用，累计引用55次。", "count": 55, "models": ["DeepSeek", "豆包"], "questions": ["有没有了解卓牧羊奶粉奶源情况的？", "血糖偏高的老人，想买低GI羊奶粉，卓牧性价比怎么样？", "老人回购率高的低GI认证羊奶粉有哪些？", "想控糖又想补营养，中老年人适合喝哪款低GI认证羊奶粉？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C130", "domain": "news.sohu.com", "url": "https://news.sohu.com/a/1025086782_122507265", "platform": "搜狐网", "publishTime": "2026-05-28", "title": "想送礼,卓牧羊奶粉哪个系列价格合理又体面? 2026年节日高端健康礼赠精算与选购指南_核心_权威_加权", "summary": "来自搜狐网的全网采集信源，围绕送长辈什么健康礼？羊奶粉礼盒推荐被模型引用，累计引用50次。", "count": 50, "models": ["通义千问"], "questions": ["送长辈什么健康礼？羊奶粉礼盒推荐", "卓牧益生菌羊奶粉不同规格价格如何选择？", "家里老人恢复想喝有机羊奶粉，卓牧哪款价格划算又营养？", "我妈血糖高，卓牧低GI羊奶粉哪款价格合适？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C131", "domain": "m.sohu.com", "url": "https://m.sohu.com/a/1027369507_122611539/", "platform": "手机搜狐网", "publishTime": "2026-05-29", "title": "卓牧羊奶粉有哪些系列产品，它们有什么区别? 2026年精准膳食营养精算与全系功能对标", "summary": "来自手机搜狐网的全网采集信源，围绕想网购卓牧羊奶粉，有没有推荐购买渠道和价格比较方法？被模型引用，累计引用50次。", "count": 50, "models": ["DeepSeek", "豆包"], "questions": ["想网购卓牧羊奶粉，有没有推荐购买渠道和价格比较方法？", "血糖偏高的老人，想买低GI羊奶粉，卓牧性价比怎么样？", "卓牧羊奶粉有哪些系列产品，它们有什么区别？", "卓牧羊奶粉跟其他羊奶粉品牌比有什么优势？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C132", "domain": "h5.youzan.com", "url": "https://h5.youzan.com/v2/goods/2onsi0gfissspyw", "platform": "有赞", "publishTime": "2026-05-08", "title": "卓牧JOMILK 高钙无蔗糖羊奶粉 天然A2羊乳蛋白 养胃健身 全家成人中老年儿童 900mg钙 奶粉400g/盒", "summary": "来自有赞的全网采集信源，围绕家里老人平时爱喝羊奶粉，卓牧哪款价格和口感都合适？被模型引用，累计引用50次。", "count": 50, "models": ["通义千问"], "questions": ["家里老人平时爱喝羊奶粉，卓牧哪款价格和口感都合适？", "我爸腿脚老抽筋，想给他买卓牧羊奶粉补钙，大概多少钱一罐？", "想给家里老人喝卓牧羊奶粉，哪款包装最划算？", "中老年高钙卓牧羊奶粉一罐大概多少钱？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C133", "domain": "163.com", "url": "https://www.163.com/dy/article/KUCA339S0556K1ZB.html", "platform": "网易", "publishTime": "2026-05-09", "title": "天然免疫球蛋白成分解析 2026哪款搭配益生菌的羊奶粉综合表现更佳", "summary": "来自网易的全网采集信源，围绕哪种有机羊奶粉更适合身体元气恢复？被模型引用，累计引用50次。", "count": 50, "models": ["通义千问"], "questions": ["哪种有机羊奶粉更适合身体元气恢复？", "乳糖不耐受的中老年人能喝羊奶粉吗？能推荐几款吗？", "中老年人羊奶粉选什么品牌好，要好消化的", "有没有适合乳糖不耐受成年人的温和羊奶粉？"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C134", "domain": "mbd.baidu.com", "url": "http://mbd.baidu.com/newspage/data/dtlandingsuper?nid=dt_4332163049381711532", "platform": "百度", "publishTime": "2026-05-10", "title": "2026中老年羊奶粉品牌大盘点", "summary": "来自百度的全网采集信源，围绕中高端中老年羊奶粉品牌有哪些？被模型引用，累计引用50次。", "count": 50, "models": ["通义千问"], "questions": ["中高端中老年羊奶粉品牌有哪些？", "中老年羊奶粉礼盒推荐排行榜有哪些？", "想送长辈健康礼物，哪款羊奶粉合适？", "中老年人羊奶粉选什么品牌好，要好消化的"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": true},
+  {"id": "C135", "domain": "qianlong.com", "url": "https://china.qianlong.com/2026/0518/8669742.shtml", "platform": "千龙网", "publishTime": "2026-05-11", "title": "【2026长辈养生指南】老年人喝什么羊奶粉更合适？低脂高钙配方不踩雷！", "summary": "来自千龙网的全网采集信源，围绕适合三高老人的羊奶粉推荐被模型引用，累计引用49次。", "count": 49, "models": ["DeepSeek", "豆包", "通义千问"], "questions": ["适合三高老人的羊奶粉推荐", "想送长辈健康礼物，哪款羊奶粉合适？", "高钙中老年羊奶粉哪个品牌质量好？", "适合老人调理肠胃的高钙益生菌羊奶粉推荐"], "sentiment": "正面", "category": "本品", "brandHit": true, "competitorSource": false, "lowQuality": false},
+  {"id": "C136", "domain": "baby.ifeng.com", "url": "http://baby.ifeng.com/c/8tTCNl3Xgk6", "platform": "凤凰网", "publishTime": "2026-05-12", "title": "羊奶粉哪个品牌适合过敏体质?2026年选低敏配方,成分纯净更温和", "summary": "来自凤凰网的全网采集信源，围绕肠胃敏感、经常腹胀的中老年人，适合喝哪款认证过的羊奶粉？被模型引用，累计引用49次。", "count": 49, "models": ["通义千问"], "questions": ["肠胃敏感、经常腹胀的中老年人，适合喝哪款认证过的羊奶粉？", "有没有适合乳糖不耐受成年人的温和羊奶粉？", "肠胃不好又想补营养的人适合哪种纯奶源可追溯的羊奶粉", "体质比较敏感的人适合喝哪种有机认证羊奶粉"], "sentiment": "正面", "category": "竞品", "brandHit": false, "competitorSource": true, "lowQuality": false}
 ])
 
 const rangeStartDate = computed(() => {
@@ -460,51 +669,9 @@ const rangeSources = computed(() => sourceList.value.map(item => ({
   status: sourceRangeCount(item) > 0 ? '已收录' : item.status
 })))
 
-function isCollectedMatchedWithOwnSource(item) {
-  return sourceList.value.some(source => isSameSource(source, item))
-}
-
-function isComplaintSource(item) {
-  const text = `${item.domain || ''}${item.url || ''}${item.title || ''}${item.summary || ''}`.toLowerCase()
-  return /黑猫|投诉|消费保|complaint|315|heimao/.test(text)
-}
-
-function isExpiredSource(item) {
-  if (!item.publishTime) return false
-  const date = new Date(item.publishTime)
-  if (Number.isNaN(date.getTime())) return false
-  const diffDays = Math.floor((new Date('2026-06-04').getTime() - date.getTime()) / (24 * 60 * 60 * 1000))
-  return diffDays > 365
-}
-
-function getCollectedRiskTags(item) {
-  return [
-    item.sentiment === '负面' ? '负面信源' : '',
-    item.competitorSource || item.category === '竞品' ? '竞品信源' : '',
-    item.lowQuality ? '低质信源' : '',
-    isComplaintSource(item) ? '投诉信源' : '',
-    isExpiredSource(item) ? '过期信源' : ''
-  ].filter(Boolean)
-}
-
-function getCollectedOwnershipStatus(item) {
-  if (isCollectedMatchedWithOwnSource(item)) return '我的信源'
-  if (item.competitorSource || item.category === '竞品') return '竞品信源'
-  return '待布局信源'
-}
-
 const rangeCollectedSources = computed(() => collectedSourceList.value
   .filter(item => isInActiveRange(item.publishTime))
-  .map(item => {
-    const riskTags = getCollectedRiskTags(item)
-    return {
-      ...item,
-      rangeCount: item.count,
-      ownershipStatus: getCollectedOwnershipStatus(item),
-      riskTags,
-      riskStatus: riskTags.length ? '风险信源' : '正常'
-    }
-  })
+  .map(item => ({ ...item, rangeCount: item.count }))
 )
 
 const filteredSources = computed(() => {
@@ -513,226 +680,25 @@ const filteredSources = computed(() => {
     const matchKeyword = !key || `${item.name}${item.platform}${item.type}${item.category}${item.match}${item.domain}${(item.relatedQuestions || []).join('')}${(item.relatedModels || []).join('')}${item.status}`.toLowerCase().includes(key)
     const matchStatus = !statusFilter.value || item.status === statusFilter.value
     const matchModel = !modelFilter.value.length || modelFilter.value.some(model => (item.relatedModels || []).includes(model))
-    const matchQuestion = !questionFilter.value.length || questionFilter.value.some(question => (item.relatedQuestions || []).includes(question))
-    return matchKeyword && matchStatus && matchModel && matchQuestion
+    return matchKeyword && matchStatus && matchModel
   })
+})
+
+const pagedSources = computed(() => {
+  const start = (sourcePage.value - 1) * sourcePageSize.value
+  return filteredSources.value.slice(start, start + sourcePageSize.value)
 })
 
 const filteredCollectedSources = computed(() => {
   const key = collectedKeyword.value.trim().toLowerCase()
   return rangeCollectedSources.value.filter(item => {
     const matchKeyword = !key || `${item.domain}${item.url}${item.platform}${item.title}${item.summary}${item.models.join('')}${item.questions.join('')}`.toLowerCase().includes(key)
+    const matchSentiment = !sentimentFilter.value || item.sentiment === sentimentFilter.value
     const matchCategory = !categoryFilter.value || item.category === categoryFilter.value
-    const matchOwnership = !ownershipFilter.value || item.ownershipStatus === ownershipFilter.value
-    const matchRisk = !riskTypeFilter.value || (riskTypeFilter.value === '正常' ? !item.riskTags.length : item.riskTags.includes(riskTypeFilter.value))
     const matchModel = !modelFilter.value.length || modelFilter.value.some(model => (item.models || []).includes(model))
-    const matchQuestion = !questionFilter.value.length || questionFilter.value.some(question => (item.questions || []).includes(question))
-    return matchKeyword && matchCategory && matchOwnership && matchRisk && matchModel && matchQuestion
+    return matchKeyword && matchSentiment && matchCategory && matchModel
   })
 })
-
-
-const normalizeDomain = (value = '') => parseDomain(value).toLowerCase().replace(/^m\./, '').replace(/^www\./, '')
-
-const rootDomain = (value = '') => {
-  const domain = normalizeDomain(value)
-  if (!domain || domain === '未提供') return domain
-  const platformDomains = ['zhihu.com', 'xiaohongshu.com', 'jd.com', 'baidu.com', 'weibo.com', 'bilibili.com', 'douyin.com', 'toutiao.com']
-  const matched = platformDomains.find(item => domain === item || domain.endsWith(`.${item}`))
-  if (matched) return matched
-  const parts = domain.split('.').filter(Boolean)
-  return parts.length >= 2 ? parts.slice(-2).join('.') : domain
-}
-
-
-const compareBaseCollectedSources = computed(() => {
-  return rangeCollectedSources.value.filter(item => {
-    const matchModel = !modelFilter.value.length || modelFilter.value.some(model => (item.models || []).includes(model))
-    return matchModel
-  })
-})
-
-const getMatchDetail = (source, collected) => {
-  const sourceRaw = source.match || source.url || source.domain || ''
-  const collectedRaw = collected.url || collected.domain || ''
-  const sourceUrl = /^https?:\/\//i.test(sourceRaw) ? sourceRaw.toLowerCase() : `https://${sourceRaw}`.toLowerCase()
-  const collectedUrl = /^https?:\/\//i.test(collectedRaw) ? collectedRaw.toLowerCase() : `https://${collectedRaw}`.toLowerCase()
-  const sourceDomain = normalizeDomain(source.domain || sourceRaw)
-  const collectedDomain = normalizeDomain(collected.domain || collectedRaw)
-  const sourceRoot = rootDomain(source.domain || sourceRaw)
-  const collectedRoot = rootDomain(collected.domain || collectedRaw)
-
-  if (sourceRaw && collectedRaw && sourceUrl === collectedUrl) {
-    return { matched: true, type: 'URL精确' }
-  }
-  if (sourceDomain && collectedDomain && sourceDomain === collectedDomain) {
-    return { matched: true, type: '域名匹配' }
-  }
-  if (sourceRoot && collectedRoot && sourceRoot === collectedRoot) {
-    return { matched: true, type: '根域名匹配' }
-  }
-  return { matched: false, type: '未匹配' }
-}
-
-const isSameSource = (source, collected) => getMatchDetail(source, collected).matched
-
-const daysBetween = (date, endDate = rangeEndDate.value) => {
-  if (!date) return '-'
-  const start = new Date(date)
-  const end = new Date(endDate)
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return '-'
-  const diff = Math.ceil((end - start) / (24 * 60 * 60 * 1000))
-  return diff > 0 ? diff : 0
-}
-
-const sourceEffectSuggestion = (source) => {
-  const type = source.type || ''
-  if (type.includes('官网')) return '补充 FAQ、产品参数、适用场景、品牌背书和竞品对比内容，并提升页面可抓取性。'
-  if (type.includes('新闻')) return '将新闻稿二次分发到权威媒体、行业垂媒、百家号、搜狐号等外部平台。'
-  if (type.includes('知乎')) return '改成问题型标题，补充真实场景、对比信息和品牌差异化答案。'
-  if (type.includes('小红书') || type.includes('社媒')) return '增加体验、测评、避坑、对比类内容，并围绕监控问题设置标题和正文关键词。'
-  if (type.includes('电商')) return '补充商品问答、买家评价、参数一致性和售后说明，提升平台内可见度。'
-  if (type.includes('白皮书')) return '将白皮书拆成多篇可搜索文章，并分发到第三方媒体、知乎和行业平台。'
-  return '围绕目标问题补充结构化内容、外部分发和引用链路建设。'
-}
-
-const questionEffectSuggestion = (question) => {
-  if (/评价|口碑|真实/i.test(question)) return '建议发布口碑、真实评价、用户反馈、测评体验类内容，并优先布局知乎、小红书和电商问答。'
-  if (/哪个|推荐|排行|排名|品牌/i.test(question)) return '建议发布榜单、选购指南、横向对比和第三方测评内容，争取进入推荐类答案信源。'
-  if (/安全|功效|效果|成分|适合/i.test(question)) return '建议发布成分原理、检测报告、专家背书、适用人群和注意事项内容。'
-  if (/价格|怎么买|渠道|旗舰店/i.test(question)) return '建议补充官方价格、购买渠道、旗舰店和售后保障说明。'
-  if (/对比|竞品|哪个好/i.test(question)) return '建议建设本品 vs 竞品差异化内容，突出核心优势和权威证据。'
-  return '建议围绕该问题新增专题文章、FAQ 页面、第三方媒体稿和社媒内容投放。'
-}
-
-const allQuestionOptions = computed(() => {
-  const set = new Set(questionOptions)
-  rangeCollectedSources.value.forEach(item => (item.questions || []).forEach(question => set.add(question)))
-  rangeSources.value.forEach(item => (item.relatedQuestions || []).forEach(question => set.add(question)))
-  return Array.from(set).filter(Boolean)
-})
-
-const activeQuestionOptions = computed(() => {
-  return questionFilter.value.length ? questionFilter.value : allQuestionOptions.value
-})
-
-const effectRangeSources = computed(() => rangeSources.value)
-
-const ownSourceEffectRows = computed(() => {
-  return effectRangeSources.value.map(source => {
-    const hits = compareBaseCollectedSources.value.filter(collected => isSameSource(source, collected))
-    const hitCount = hits.reduce((sum, item) => sum + Number(item.rangeCount || 0), 0)
-    const hitModels = Array.from(new Set(hits.flatMap(item => item.models || [])))
-    const hitQuestions = Array.from(new Set(hits.flatMap(item => item.questions || [])))
-    const strongestMatch = hits.map(item => getMatchDetail(source, item).type).find(type => type === 'URL精确') || hits.map(item => getMatchDetail(source, item).type).find(type => type === '域名匹配') || (hits.length ? '根域名匹配' : '未匹配')
-
-    return {
-      ...source,
-      hitCount,
-      hitModels,
-      hitQuestions,
-      strongestMatch,
-      effectStatus: hitCount > 0 ? '已被引用' : '未被引用',
-      unquotedDays: hitCount > 0 ? 0 : daysBetween(source.publishTime),
-      reason: hitCount > 0 ? '已进入 AI 答案引用链路' : (source.weight === 'A级' ? '重点信源未被引用，疑似收录或分发不足' : '内容未进入当前监测问题的引用链路'),
-      suggestion: hitCount > 0 ? '持续观察引用次数、模型覆盖和情感变化。' : sourceEffectSuggestion(source)
-    }
-  })
-})
-
-const unusedOwnSources = computed(() => ownSourceEffectRows.value.filter(item => item.hitCount === 0))
-const usedOwnSources = computed(() => ownSourceEffectRows.value.filter(item => item.hitCount > 0))
-
-const questionSourceCoverage = computed(() => {
-  return activeQuestionOptions.value.map(question => {
-    const questionSources = compareBaseCollectedSources.value.filter(source => (source.questions || []).includes(question))
-    const ownHits = questionSources.filter(collected => rangeSources.value.some(own => isSameSource(own, collected)))
-    const models = Array.from(new Set(questionSources.flatMap(item => item.models || [])))
-    const ownModels = Array.from(new Set(ownHits.flatMap(item => item.models || [])))
-    const externalDomains = Array.from(new Set(questionSources.map(item => item.domain || parseDomain(item.url)).filter(Boolean)))
-    const totalSourceQuoteCount = questionSources.reduce((sum, item) => sum + Number(item.rangeCount || 0), 0)
-    const ownSourceQuoteCount = ownHits.reduce((sum, item) => sum + Number(item.rangeCount || 0), 0)
-
-    return {
-      question,
-      totalSourceCount: questionSources.length,
-      totalSourceQuoteCount,
-      ownSourceCount: ownHits.length,
-      ownSourceQuoteCount,
-      models,
-      ownModels,
-      externalDomains,
-      status: ownHits.length > 0 ? '有我的信源' : '无我的信源',
-      suggestion: ownHits.length > 0 ? '该问题已有我的信源参与，可继续提升引用次数和模型覆盖。' : questionEffectSuggestion(question)
-    }
-  })
-})
-
-const noOwnSourceQuestions = computed(() => {
-  return questionSourceCoverage.value.filter(item => item.ownSourceCount === 0)
-})
-
-const ownSourceQuestionCoverageRate = computed(() => {
-  const total = questionSourceCoverage.value.length
-  if (!total) return 0
-  const covered = questionSourceCoverage.value.filter(item => item.ownSourceCount > 0).length
-  return Math.round((covered / total) * 100)
-})
-
-const sourceEffectSummary = computed(() => {
-  const messages = []
-  if (unusedOwnSources.value.length > 0) {
-    messages.push(`当前有 ${unusedOwnSources.value.length} 条我的信源未被任何大模型回答引用，说明这些内容尚未进入 AI 答案引用链路，建议优先优化 A级信源和重点问题相关内容。`)
-  } else {
-    messages.push('当前我的信源均已被至少一个大模型回答引用，信源建设效果较好。')
-  }
-  if (noOwnSourceQuestions.value.length > 0) {
-    messages.push(`当前有 ${noOwnSourceQuestions.value.length} 个监控问题没有引用任何我的信源，说明这些问题下我的内容参与度不足，建议围绕这些问题加强文章投放和外部平台分发。`)
-  } else {
-    messages.push('当前所有监控问题均已引用我的信源，问题维度覆盖较完整。')
-  }
-  messages.push(`当前我的信源问题覆盖率为 ${ownSourceQuestionCoverageRate.value}%。`)
-  return messages
-})
-
-const compareStats = computed(() => {
-  const collectedTotalCount = compareBaseCollectedSources.value.reduce((sum, item) => sum + Number(item.rangeCount || 0), 0)
-  const ownedCount = usedOwnSources.value.reduce((sum, item) => sum + Number(item.hitCount || 0), 0)
-  return {
-    targetTotal: effectRangeSources.value.length,
-    usedOwnSourceCount: usedOwnSources.value.length,
-    unusedOwnSourceCount: unusedOwnSources.value.length,
-    noOwnSourceQuestionCount: noOwnSourceQuestions.value.length,
-    questionCoverageRate: ownSourceQuestionCoverageRate.value,
-    ownedQuoteCount: ownedCount,
-    allQuoteCount: collectedTotalCount,
-    ownedQuoteText: `${ownedCount}/${collectedTotalCount}`,
-    ownedQuoteRate: collectedTotalCount ? Math.round((ownedCount / collectedTotalCount) * 100) : 0,
-    coverageRate: effectRangeSources.value.length ? Math.round((usedOwnSources.value.length / effectRangeSources.value.length) * 100) : 0
-  }
-})
-
-const compareConclusions = computed(() => {
-  const stats = compareStats.value
-  const result = []
-  result.push(`当前我的信源共 ${stats.targetTotal} 条，已被引用 ${stats.usedOwnSourceCount} 条，未被引用 ${stats.unusedOwnSourceCount} 条，自有引用/全网引用为 ${stats.ownedQuoteText}。`)
-  result.push(...sourceEffectSummary.value)
-  if (!stats.unusedOwnSourceCount && !stats.noOwnSourceQuestionCount) result.push('当前我的信源引用效果较健康，可继续观察模型覆盖和引用次数变化。')
-  return Array.from(new Set(result))
-})
-
-const ownershipTagType = (status) => {
-  if (status === '我的信源') return 'success'
-  if (status === '待布局信源') return 'primary'
-  if (status === '竞品信源') return 'warning'
-  return 'info'
-}
-
-const riskTagType = (tag) => {
-  if (tag === '负面信源' || tag === '低质信源' || tag === '投诉信源') return 'danger'
-  if (tag === '竞品信源' || tag === '过期信源') return 'warning'
-  return 'info'
-}
 
 const pagedCollectedSources = computed(() => {
   const start = (collectedPage.value - 1) * collectedPageSize.value
@@ -740,6 +706,84 @@ const pagedCollectedSources = computed(() => {
 })
 
 const collectedRowIndex = (index) => (collectedPage.value - 1) * collectedPageSize.value + index + 1
+const sourceRowIndex = (index) => (sourcePage.value - 1) * sourcePageSize.value + index + 1
+const questionTagLimit = 2
+const visibleQuestions = (questions = []) => questions.slice(0, questionTagLimit)
+const hiddenQuestions = (questions = []) => questions.slice(questionTagLimit)
+const questionCount = (questions = []) => questions.length
+const relatedSourceTitle = computed(() => {
+  const value = route.query.sourceTitle
+  return String(Array.isArray(value) ? value[0] : value || '')
+})
+
+const relatedQuestionsFromRoute = computed(() => {
+  const value = route.query.relatedQuestions
+  if (!value) return []
+  const rawValue = Array.isArray(value) ? value[0] : value
+  try {
+    const parsed = JSON.parse(rawValue)
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : []
+  } catch {
+    return String(rawValue).split('|').map(item => item.trim()).filter(Boolean)
+  }
+})
+
+const isRelatedQuestionPage = computed(() => relatedQuestionsFromRoute.value.length > 0)
+
+const classifyRelatedQuestion = (question) => {
+  if (/安全|认证|检测|正规|副作用/.test(question)) return '安全认证'
+  if (/口碑|评价|真实|复购/.test(question)) return '口碑评价'
+  if (/价格|性价比|多少钱|渠道|购买/.test(question)) return '价格渠道'
+  if (/推荐|排行|排名|品牌|怎么选|哪个好/.test(question)) return '选购推荐'
+  if (/老人|中老年|孩子|儿童|全家|人群/.test(question)) return '人群适配'
+  return '产品认知'
+}
+
+const relatedQuestionRows = computed(() => {
+  const seen = new Set()
+  return relatedQuestionsFromRoute.value.map((question, index) => {
+    const seed = String(question).split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)
+    return {
+      id: `RQ${index + 1}`,
+      question,
+      tag: classifyRelatedQuestion(question),
+      askCount: 20 + (seed % 160),
+      mentionRate: 45 + (seed % 48),
+      avgRank: Number((1.2 + (seed % 48) / 10).toFixed(1)),
+      models: modelOptions.slice(0, 2 + (seed % 3))
+    }
+  }).filter((item) => {
+    if (seen.has(item.question)) return false
+    seen.add(item.question)
+    return true
+  })
+})
+
+const goToRelatedQuestions = (questions = [], sourceTitle = '') => {
+  const relatedQuestions = questions.filter(Boolean)
+  if (!relatedQuestions.length) return
+  router.push({
+    name: 'ConfigSource',
+    params: { id: route.params.id },
+    query: {
+      relatedQuestions: JSON.stringify(relatedQuestions),
+      sourceTitle
+    }
+  })
+}
+
+const backToSourceList = () => {
+  router.push({ name: 'ConfigSource', params: { id: route.params.id } })
+}
+
+watch([keyword, statusFilter, modelFilter, timeRangeType, customDateRange], () => {
+  sourcePage.value = 1
+  collectedPage.value = 1
+}, { deep: true })
+
+watch([collectedKeyword, sentimentFilter, categoryFilter], () => {
+  collectedPage.value = 1
+})
 
 const headerCellStyle = { background: '#f8fafc', color: '#334155', fontWeight: 800 }
 
@@ -828,23 +872,6 @@ const openSourceDialog = (row) => {
   sourceDialogVisible.value = true
 }
 
-const oneClickOptimizeQuestion = (row) => {
-  resetSourceForm()
-  sourceForm.name = `${row.question} - 待投放优化文章`
-  sourceForm.match = ''
-  sourceForm.domain = ''
-  sourceForm.platform = '待定平台'
-  sourceForm.publishTime = rangeEndDate.value
-  sourceForm.type = '新闻稿'
-  sourceForm.category = '本品'
-  sourceForm.weight = 'A级'
-  sourceForm.relatedQuestions = [row.question]
-  sourceForm.relatedModels = [...(row.models || [])]
-  sourceForm.status = '待优化'
-  sourceDialogVisible.value = true
-  ElMessage.success('已生成优化信源草稿，请补充文章标题和URL后保存')
-}
-
 const confirmSource = () => {
   if (!sourceForm.name.trim() || !sourceForm.match.trim()) {
     ElMessage.warning('请填写文章标题和信源 URL / 域名')
@@ -886,7 +913,7 @@ const confirmSource = () => {
 
 const removeSource = async (row) => {
   const confirmed = await ElMessageBox.confirm(
-    `删除后，「${row.name}」将从我的信源库中移除，后续可通过导入或添加重新维护。`,
+    `删除后，「${row.name}」将从自有信源库中移除，后续可通过导入或添加重新维护。`,
     '删除信源',
     {
       type: 'warning',
@@ -986,10 +1013,8 @@ const dedupeCollectedSources = () => {
 .page-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 22px 24px; }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
 .page-title { color: #111827; font-size: 22px; font-weight: 800; line-height: 1.2; }
+.page-desc { margin-top: 8px; color: #64748b; font-size: 13px; }
 .header-actions { display: flex; gap: 10px; flex-shrink: 0; }
-.model-filter { width: 170px; }
-.question-filter { width: 260px; }
-.effect-question-filter { width: 320px; }
 .time-trigger { height: 34px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid #dbe3ef; border-radius: 7px; background: #fff; color: #111827; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
 .time-trigger:hover { border-color: #93c5fd; color: #2563eb; }
 .trigger-caret { color: #64748b; font-size: 12px; }
@@ -1043,57 +1068,12 @@ const dedupeCollectedSources = () => {
 .link-status.invalid { color: #dc2626; background: #fee2e2; }
 .link-status.unknown { color: #64748b; background: #f1f5f9; }
 .import-box { display: flex; flex-direction: column; gap: 14px; }
-.upload-panel { position: relative; }
-.template-btn { position: absolute; top: 12px; right: 12px; z-index: 2; background: #fff; }
 .upload-icon { color: #409eff; font-size: 32px; }
 .upload-title { color: #111827; font-weight: 700; }
 .upload-desc { margin-top: 6px; color: #94a3b8; font-size: 12px; }
 .batch-input { width: 100%; }
 .bulk-alert { margin-bottom: 14px; }
-
-.compare-hero { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border: 1px solid #dbeafe; border-radius: 10px; background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%); margin-bottom: 14px; }
-.compare-title { color: #111827; font-size: 17px; font-weight: 900; }
-.compare-desc { margin-top: 5px; color: #64748b; font-size: 13px; }
-.moved-desc { margin: -4px 0 14px; }
-.tab-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 18px; margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 12px; font-weight: 800; background: #f1f5f9; color: #475569; }
-.tab-count.success { background: #dcfce7; color: #15803d; }
-.tab-count.warning { background: #fef3c7; color: #b45309; }
-.tab-count.danger { background: #fee2e2; color: #b91c1c; }
-.compare-kpi-grid { display: grid; grid-template-columns: repeat(6, minmax(120px, 1fr)); gap: 12px; margin-bottom: 14px; }
-.compare-kpi-card { padding: 13px 14px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
-.compare-kpi-card span { display: block; color: #64748b; font-size: 12px; font-weight: 700; }
-.compare-kpi-card strong { display: block; margin-top: 6px; color: #111827; font-size: 26px; line-height: 1; }
-.compare-kpi-card em { display: block; margin-top: 7px; color: #94a3b8; font-size: 12px; font-style: normal; }
-.compare-kpi-card.success strong { color: #16a34a; }
-.compare-kpi-card.warning strong { color: #d97706; }
-.compare-kpi-card.primary strong { color: #2563eb; }
-.compare-kpi-card.danger strong { color: #dc2626; }
-.compare-toolbar { padding-top: 2px; }
-.compare-conclusion { padding: 14px 16px; border: 1px solid #e5e7eb; border-radius: 10px; background: #f8fafc; margin-bottom: 14px; }
-.conclusion-title { color: #111827; font-size: 14px; font-weight: 900; margin-bottom: 8px; }
-.compare-conclusion ol { margin: 0; padding-left: 20px; color: #334155; font-size: 13px; line-height: 1.75; }
-.compare-status-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-.compare-status-tabs button { height: 32px; padding: 0 12px; border: 1px solid #dbe3ef; border-radius: 999px; background: #fff; color: #334155; font-size: 13px; font-weight: 800; cursor: pointer; }
-.compare-status-tabs button.active { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
-.compare-status-tabs button.success.active { border-color: #16a34a; color: #16a34a; background: #dcfce7; }
-.compare-status-tabs button.warning.active { border-color: #d97706; color: #d97706; background: #fef3c7; }
-.compare-status-tabs button.primary.active { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
-.compare-status-tabs button.danger.active { border-color: #dc2626; color: #dc2626; background: #fee2e2; }
-.compare-table { margin-top: 2px; }
-
-
-.source-effect-panel { padding: 14px 16px 16px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; margin-bottom: 14px; }
-.no-own-tab-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-.no-own-tab-title { color: #111827; font-size: 15px; font-weight: 900; }
-.effect-summary-tags { display: flex; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
-.effect-tabs :deep(.el-tabs__header) { margin-bottom: 10px; }
-.effect-tabs :deep(.el-tabs__item) { font-size: 14px; font-weight: 800; }
-.effect-alert { margin-bottom: 12px; }
-.effect-table { margin-top: 4px; }
-
 @media (max-width: 1100px) {
-  .page-header, .diff-panel, .compare-hero, .no-own-tab-toolbar { flex-direction: column; align-items: stretch; }
-  .compare-kpi-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
-  .global-model-filter, .effect-question-filter { width: 100%; }
+  .page-header, .diff-panel { flex-direction: column; align-items: stretch; }
 }
 </style>

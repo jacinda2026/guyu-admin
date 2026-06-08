@@ -460,6 +460,10 @@ const currentAnalysisGuide = computed(() => {
 })
 
 const currentDetailTitle = computed(() => {
+  if (route.path.includes('/config/source') && route.query.sourceTitle) {
+    const value = route.query.sourceTitle
+    return String(Array.isArray(value) ? value[0] : value)
+  }
   if (route.path.includes('/monitor/') && route.params.questionId) {
     return monitorQuestionTitles[route.params.questionId] || String(route.params.questionId)
   }
