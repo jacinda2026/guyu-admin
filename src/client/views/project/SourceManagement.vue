@@ -6,7 +6,7 @@
         <div>
           <div class="page-title">监控问题列表明细</div>
         </div>
-        <el-button text type="primary" @click="backToSourceList">返回我的信源</el-button>
+        <el-button text type="primary" @click="backToSourceList">返回发布信源</el-button>
       </div>
 
       <el-table :data="relatedQuestionRows" class="source-table" :header-cell-style="headerCellStyle">
@@ -39,13 +39,13 @@
     <section v-else class="page-card">
       <div class="page-header">
         <div>
-          <div class="page-title">信源管理</div>
-          <div class="page-desc">管理全网采集信源、客户目标信源池和差异运算结果，用于判断品牌信源覆盖、竞品信源、低质信源和缺失信源。</div>
+          <div class="page-title">发布信源管理</div>
+          <div class="page-desc">管理已发布、投放和维护的信源内容，同时对比全网采集信源和差异运算结果，用于判断品牌信源覆盖、竞品信源、低质信源和缺失信源。</div>
         </div>
       </div>
 
       <el-tabs v-model="activeTab" class="source-tabs">
-        <el-tab-pane label="自有信源库" name="target">
+        <el-tab-pane label="发布信源库" name="target">
           <div class="table-toolbar">
             <el-popover v-model:visible="targetTimePanelVisible" placement="bottom-start" trigger="click" :width="260" popper-class="source-time-popover" @show="syncPendingDateRange">
               <template #reference>
@@ -154,7 +154,7 @@
           </el-table>
 
           <div class="pagination-bar">
-            <span>共 {{ filteredSources.length }} 条我的信源</span>
+            <span>共 {{ filteredSources.length }} 条发布信源</span>
             <el-pagination
               v-model:current-page="sourcePage"
               v-model:page-size="sourcePageSize"
@@ -913,7 +913,7 @@ const confirmSource = () => {
 
 const removeSource = async (row) => {
   const confirmed = await ElMessageBox.confirm(
-    `删除后，「${row.name}」将从自有信源库中移除，后续可通过导入或添加重新维护。`,
+    `删除后，「${row.name}」将从发布信源库中移除，后续可通过导入或添加重新维护。`,
     '删除信源',
     {
       type: 'warning',

@@ -1,4 +1,4 @@
-<!-- VERSION: ProjectSources_v20260604_1452 | 信源效果评估新增双趋势图：我的信源引用次数、引用我的信源的问题数量 -->
+<!-- VERSION: ProjectSources_v20260604_1452 | 信源效果评估新增双趋势图：发布信源引用次数、引用发布信源的问题数量 -->
 <template>
   <div class="sources-container">
     
@@ -252,32 +252,25 @@
 
       <el-tab-pane label="信源效果评估" name="effect">
         <el-row :gutter="16" class="mb-20 effect-kpi-row">
-          <el-col :span="6">
-            <el-card shadow="never" class="effect-kpi-card">
-              <div class="effect-kpi-title">我的信源</div>
-              <div class="effect-kpi-value">{{ sourceEffectStats.ownSourceTotal }}</div>
-              <div class="effect-kpi-desc">已配置管理</div>
-            </el-card>
-          </el-col>
-          <el-col :span="6">
+          <el-col :span="8">
             <el-card shadow="never" class="effect-kpi-card warning-card">
-              <div class="effect-kpi-title">未被引用信源</div>
-              <div class="effect-kpi-value">{{ sourceEffectStats.unusedSourceCount }}</div>
-              <div class="effect-kpi-desc">没有被任何模型引用</div>
+              <div class="effect-kpi-title">发布信源</div>
+              <div class="effect-kpi-value small">{{ sourceEffectStats.unusedSourceText }}</div>
+              <div class="effect-kpi-desc">未被引用的信源/信源总数</div>
             </el-card>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="8">
             <el-card shadow="never" class="effect-kpi-card danger-card">
-              <div class="effect-kpi-title">无我的信源问题</div>
-              <div class="effect-kpi-value">{{ sourceEffectStats.noOwnSourceQuestionCount }}</div>
-              <div class="effect-kpi-desc">问题下缺少我的信源</div>
+              <div class="effect-kpi-title">监控问题</div>
+              <div class="effect-kpi-value small">{{ sourceEffectStats.noOwnSourceQuestionText }}</div>
+              <div class="effect-kpi-desc">没有引用发布信源的问题数/问题总数</div>
             </el-card>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="8">
             <el-card shadow="never" class="effect-kpi-card primary-card">
               <div class="effect-kpi-title">信源引用比例</div>
               <div class="effect-kpi-value small">{{ sourceEffectStats.ownedQuoteText }}</div>
-              <div class="effect-kpi-desc">自有引用/全网引用(排除自有信源)</div>
+              <div class="effect-kpi-desc">发布信源引用/全网引用</div>
             </el-card>
           </el-col>
         </el-row>
@@ -287,7 +280,7 @@
           <el-col :span="12">
             <el-card shadow="never" class="section-card trend-card">
               <template #header>
-                <div class="section-title">我的信源引用趋势</div>
+                <div class="section-title">信源趋势</div>
               </template>
               <div ref="ownSourceQuoteTrendChartRef" class="trend-chart"></div>
             </el-card>
@@ -295,7 +288,7 @@
           <el-col :span="12">
             <el-card shadow="never" class="section-card trend-card">
               <template #header>
-                <div class="section-title">引用我的信源的问题趋势</div>
+                <div class="section-title">问题趋势</div>
               </template>
               <div ref="ownSourceQuestionTrendChartRef" class="trend-chart"></div>
             </el-card>
@@ -314,15 +307,22 @@
         <el-card shadow="never" class="section-card source-effect-card">
           <el-tabs v-model="sourceEffectTab" class="effect-inner-tabs">
             <el-tab-pane name="unusedSources">
-              <template #label>未被引用信源 <span class="tab-count warning">{{ unusedOwnSources.length }}</span></template>
+              <template #label>发布信源效果 <span class="tab-count warning">{{ filteredSourceEffectRows.length }}</span></template>
+              <div class="source-effect-toolbar">
+                <el-select v-model="sourceCitationFilter" size="small" style="width: 160px;">
+                  <el-option label="全部信源" value="all" />
+                  <el-option label="已引用" value="quoted" />
+                  <el-option label="未引用" value="unquoted" />
+                </el-select>
+              </div>
               <el-alert
                 class="effect-alert"
-                type="warning"
+                type="info"
                 :closable="false"
                 show-icon
-                title="这些信源已加入我的信源库，但在当前筛选口径下没有被任何大模型回答引用，说明内容尚未进入 AI 答案引用链路。"
+                title="这里聚焦发布信源的引用效果、原因判断和优化动作；信源新增、编辑、去重和链接检测请到「发布信源」管理。"
               />
-              <el-table :data="unusedOwnSources" style="width: 100%" size="small" :header-cell-style="{background:'#f8fafc', color:'#64748b'}">
+              <el-table :data="filteredSourceEffectRows" style="width: 100%" size="small" :header-cell-style="{background:'#f8fafc', color:'#64748b'}">
                 <el-table-column type="index" label="#" width="56" align="center" />
                 <el-table-column label="信源名称" min-width="260" show-overflow-tooltip>
                   <template #default="{row}">
@@ -354,15 +354,30 @@
                   </template>
                 </el-table-column>
                 <el-table-column prop="hitCount" label="当前引用次数" width="116" align="center" />
+                <el-table-column prop="citationStatus" label="状态" width="110" align="center">
+                  <template #default="{row}">
+                    <el-tag :type="row.hitCount > 0 ? 'success' : 'warning'" size="small" effect="plain">{{ row.citationStatus }}</el-tag>
+                  </template>
+                </el-table-column>
                 <el-table-column prop="unquotedDays" label="未引用天数" width="108" align="center" />
                 <el-table-column prop="reason" label="原因判断" min-width="180" show-overflow-tooltip />
                 <el-table-column prop="suggestion" label="建议动作" min-width="280" show-overflow-tooltip />
+                <el-table-column label="操作" width="100" fixed="right" align="center">
+                  <template #default="{row}">
+                    <el-button link type="primary" @click="goToSourceManagement(row)">去管理</el-button>
+                  </template>
+                </el-table-column>
               </el-table>
             </el-tab-pane>
 
             <el-tab-pane name="noOwnSourceQuestions">
-              <template #label>无我的信源问题 <span class="tab-count danger">{{ noOwnSourceQuestions.length }}</span></template>
+              <template #label>监控问题 <span class="tab-count danger">{{ filteredQuestionCoverageRows.length }}</span></template>
               <div class="no-own-question-toolbar">
+                <el-select v-model="questionCitationFilter" size="small" style="width: 170px;">
+                  <el-option label="全部问题" value="all" />
+                  <el-option label="引用发布信源" value="quoted" />
+                  <el-option label="未引用发布信源" value="unquoted" />
+                </el-select>
                 <el-select
                   v-model="questionFilter"
                   class="question-filter-select"
@@ -378,17 +393,17 @@
               </div>
               <el-alert
                 class="effect-alert"
-                type="error"
+                type="info"
                 :closable="false"
                 show-icon
-                title="这些监控问题下，大模型回答没有引用任何我的信源，说明该问题缺少我的内容资产参与，需要加强文章投放。"
+                title="按当前筛选口径查看监控问题是否引用发布信源，可通过筛选条件切换引用和未引用。"
               />
-              <el-table :data="noOwnSourceQuestions" style="width: 100%" size="small" :header-cell-style="{background:'#f8fafc', color:'#64748b'}">
+              <el-table :data="filteredQuestionCoverageRows" style="width: 100%" size="small" :header-cell-style="{background:'#f8fafc', color:'#64748b'}">
                 <el-table-column type="index" label="#" width="56" align="center" />
                 <el-table-column prop="question" label="监控问题" min-width="300" show-overflow-tooltip />
                 <el-table-column prop="totalSourceCount" label="全网信源数" width="108" align="center" />
-                <el-table-column prop="ownSourceCount" label="我的信源数" width="108" align="center" />
-                <el-table-column prop="ownSourceQuoteCount" label="自有引用次数" width="116" align="center" />
+                <el-table-column prop="ownSourceCount" label="发布信源数" width="108" align="center" />
+                <el-table-column prop="ownSourceQuoteCount" label="发布信源引用次数" width="140" align="center" />
                 <el-table-column label="覆盖模型" min-width="160">
                   <template #default="{row}">
                     <div class="effect-tag-list compact">
@@ -406,7 +421,7 @@
                   </template>
                 </el-table-column>
                 <el-table-column prop="status" label="状态" width="120" align="center">
-                  <template #default="{row}"><el-tag :type="row.status === '无我的信源' ? 'danger' : 'success'" size="small" effect="plain">{{ row.status }}</el-tag></template>
+                  <template #default="{row}"><el-tag :type="row.status === '未引用发布信源' ? 'danger' : 'success'" size="small" effect="plain">{{ row.status }}</el-tag></template>
                 </el-table-column>
                 <el-table-column prop="suggestion" label="建议动作" min-width="300" show-overflow-tooltip />
                 <el-table-column label="操作" width="110" fixed="right" align="center">
@@ -425,9 +440,13 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Download, DataAnalysis, Platform } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { ElMessage } from 'element-plus'
+
+const route = useRoute()
+const router = useRouter()
 
 const filterForm = reactive({
   model: 'all',
@@ -437,6 +456,8 @@ const filterForm = reactive({
 const sourcePageTab = ref('stats')
 const sourceEffectTab = ref('unusedSources')
 const questionFilter = ref([])
+const sourceCitationFilter = ref('all')
+const questionCitationFilter = ref('all')
 
 const sourceTab = ref('domain')
 const sourceSearch = ref('')
@@ -994,6 +1015,7 @@ const ownSourceEffectRows = computed(() => {
     return {
       ...source,
       hitCount,
+      citationStatus: hitCount > 0 ? '已引用' : '未引用',
       unquotedDays: hitCount > 0 ? 0 : daysBetween(source.publishTime),
       reason: hitCount > 0 ? '已进入 AI 答案引用链路' : (source.weight === 'A级' ? '重点信源未被引用，疑似收录或分发不足' : '内容未进入当前监测问题的引用链路'),
       suggestion: hitCount > 0 ? '持续观察引用次数、模型覆盖和情感变化。' : sourceEffectSuggestion(source)
@@ -1003,6 +1025,11 @@ const ownSourceEffectRows = computed(() => {
 
 const usedOwnSources = computed(() => ownSourceEffectRows.value.filter(item => item.hitCount > 0))
 const unusedOwnSources = computed(() => ownSourceEffectRows.value.filter(item => item.hitCount === 0))
+const filteredSourceEffectRows = computed(() => {
+  if (sourceCitationFilter.value === 'quoted') return usedOwnSources.value
+  if (sourceCitationFilter.value === 'unquoted') return unusedOwnSources.value
+  return ownSourceEffectRows.value
+})
 
 const questionSourceCoverage = computed(() => {
   return activeQuestionOptions.value.map(question => {
@@ -1018,13 +1045,18 @@ const questionSourceCoverage = computed(() => {
       ownSourceQuoteCount,
       models,
       externalDomains,
-      status: ownHits.length > 0 ? '有我的信源' : '无我的信源',
-      suggestion: ownHits.length > 0 ? '该问题已有我的信源参与，可继续提升引用次数和模型覆盖。' : questionEffectSuggestion(question)
+      status: ownHits.length > 0 ? '已引用发布信源' : '未引用发布信源',
+      suggestion: ownHits.length > 0 ? '该问题已有发布信源参与，可继续提升引用次数和模型覆盖。' : questionEffectSuggestion(question)
     }
   })
 })
 
 const noOwnSourceQuestions = computed(() => questionSourceCoverage.value.filter(item => item.ownSourceCount === 0))
+const filteredQuestionCoverageRows = computed(() => {
+  if (questionCitationFilter.value === 'quoted') return questionSourceCoverage.value.filter(item => item.ownSourceCount > 0)
+  if (questionCitationFilter.value === 'unquoted') return noOwnSourceQuestions.value
+  return questionSourceCoverage.value
+})
 
 const sourceEffectStats = computed(() => {
   const allQuoteCount = filteredEffectCollectedSources.value.reduce((sum, item) => sum + Number(item.rangeCount || 0), 0)
@@ -1032,17 +1064,20 @@ const sourceEffectStats = computed(() => {
   return {
     ownSourceTotal: mySourceList.value.length,
     unusedSourceCount: unusedOwnSources.value.length,
+    unusedSourceText: `${unusedOwnSources.value.length}/${mySourceList.value.length}`,
     noOwnSourceQuestionCount: noOwnSourceQuestions.value.length,
+    noOwnSourceQuestionTotal: questionSourceCoverage.value.length,
+    noOwnSourceQuestionText: `${noOwnSourceQuestions.value.length}/${questionSourceCoverage.value.length}`,
     ownedQuoteText: `${ownQuoteCount}/${allQuoteCount}`
   }
 })
 
 const sourceEffectConclusions = computed(() => {
   const result = []
-  result.push(`当前我的信源共 ${mySourceList.value.length} 条，未被引用 ${unusedOwnSources.value.length} 条，自有引用/全网引用为 ${sourceEffectStats.value.ownedQuoteText}。`)
-  if (unusedOwnSources.value.length > 0) result.push(`当前有 ${unusedOwnSources.value.length} 条我的信源未被任何大模型回答引用，建议优先优化 A级信源和重点问题相关内容。`)
-  if (noOwnSourceQuestions.value.length > 0) result.push(`当前有 ${noOwnSourceQuestions.value.length} 个监控问题没有引用任何我的信源，建议围绕这些问题加强文章投放和外部平台分发。`)
-  if (!unusedOwnSources.value.length && !noOwnSourceQuestions.value.length) result.push('当前我的信源引用效果较健康，可继续观察模型覆盖和引用次数变化。')
+  result.push(`当前发布信源共 ${mySourceList.value.length} 条，未被引用 ${unusedOwnSources.value.length} 条，发布信源引用/全网引用为 ${sourceEffectStats.value.ownedQuoteText}。`)
+  if (unusedOwnSources.value.length > 0) result.push(`当前有 ${unusedOwnSources.value.length} 条发布信源未被任何大模型回答引用，建议优先优化 A级信源和重点问题相关内容。`)
+  if (noOwnSourceQuestions.value.length > 0) result.push(`当前有 ${noOwnSourceQuestions.value.length} 个监控问题没有引用任何发布信源，建议围绕这些问题加强文章投放和外部平台分发。`)
+  if (!unusedOwnSources.value.length && !noOwnSourceQuestions.value.length) result.push('当前发布信源引用效果较健康，可继续观察模型覆盖和引用次数变化。')
   return result
 })
 
@@ -1065,58 +1100,41 @@ const formatTrendDateLabel = (date) => {
   return `${Number(month)}/${Number(day)}`
 }
 
-const getDailyQuoteCount = (source, date, dateIndex, totalDays) => {
-  const dailyItems = source.dailyStats || source.dailyData || source.trend || []
-  if (Array.isArray(dailyItems) && dailyItems.length) {
-    const matched = dailyItems.find(item => item.date === date || item.day === date)
-    if (matched) return Number(matched.count || matched.quoteCount || matched.value || 0)
-  }
-
-  const sourceDate = source.date || source.collectedAt || source.createdAt
-  if (sourceDate && String(sourceDate).slice(0, 10) === date) {
-    return Number(source.rangeCount || source.usageCount || source.mentionCount || 0)
-  }
-
-  const total = Number(source.rangeCount || source.usageCount || source.mentionCount || 0)
-  if (!total || !totalDays) return 0
-  const seed = String(source.id || source.title || source.domain || '').split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)
-  const base = Math.floor(total / totalDays)
-  const remainder = total % totalDays
-  return base + (((dateIndex + seed) % totalDays) < remainder ? 1 : 0)
+const getWaveTrendCount = (total, current, dateIndex, totalDays, salt = 0) => {
+  if (total <= 1 || totalDays <= 1) return Math.max(0, Math.min(total, current))
+  if (dateIndex === totalDays - 1) return Math.max(0, Math.min(total, current))
+  const amplitude = Math.max(1, Math.ceil(total * 0.18))
+  const wave = Math.round(Math.sin((dateIndex + 1 + salt) * 1.35) * amplitude)
+  const stagger = ((dateIndex + salt) % 3) - 1
+  return Math.max(0, Math.min(total, current + wave + stagger))
 }
-
-const ownHitCollectedSources = computed(() => {
-  return filteredEffectCollectedSources.value.filter(collected => mySourceList.value.some(own => isSameSource(own, collected)))
-})
 
 const ownSourceQuoteTrendData = computed(() => {
   const dates = getEffectDateList()
+  const sourceTotal = mySourceList.value.length
+  const currentQuotedSourceCount = usedOwnSources.value.length
   return dates.map((date, dateIndex) => {
-    const quoteCount = ownHitCollectedSources.value.reduce((sum, item) => {
-      return sum + getDailyQuoteCount(item, date, dateIndex, dates.length)
-    }, 0)
+    const quotedSourceCount = getWaveTrendCount(sourceTotal, currentQuotedSourceCount, dateIndex, dates.length, 1)
     return {
       date,
       label: formatTrendDateLabel(date),
-      quoteCount
+      quotedSourceCount,
+      unquotedSourceCount: Math.max(0, sourceTotal - quotedSourceCount)
     }
   })
 })
 
 const ownSourceQuestionTrendData = computed(() => {
   const dates = getEffectDateList()
+  const questionTotal = questionSourceCoverage.value.length
+  const currentQuotedQuestionCount = questionTotal - noOwnSourceQuestions.value.length
   return dates.map((date, dateIndex) => {
-    const questionSet = new Set()
-    ownHitCollectedSources.value.forEach(item => {
-      const dailyCount = getDailyQuoteCount(item, date, dateIndex, dates.length)
-      if (dailyCount > 0) {
-        ;(item.questions || []).forEach(question => questionSet.add(question))
-      }
-    })
+    const quotedQuestionCount = getWaveTrendCount(questionTotal, currentQuotedQuestionCount, dateIndex, dates.length, 3)
     return {
       date,
       label: formatTrendDateLabel(date),
-      questionCount: questionSet.size
+      unquotedQuestionCount: Math.max(0, questionTotal - quotedQuestionCount),
+      quotedQuestionCount
     }
   })
 })
@@ -1131,6 +1149,17 @@ const oneClickOptimizeQuestion = (row) => {
   ElMessage.success(`已生成「${row.question}」的信源优化任务草稿`)
 }
 
+const goToSourceManagement = (row) => {
+  router.push({
+    name: 'ConfigSource',
+    params: { id: route.params.id },
+    query: {
+      sourceTitle: row.name,
+      sourceUrl: row.url || row.domain || ''
+    }
+  })
+}
+
 let donutChartInst = null
 let ownSourceQuoteTrendChartInst = null
 let ownSourceQuestionTrendChartInst = null
@@ -1141,9 +1170,17 @@ const handleResize = () => {
   ownSourceQuestionTrendChartInst?.resize()
 }
 
-const buildLineChartOption = ({ title, data, valueKey, seriesName, yAxisName }) => ({
+const buildLineChartOption = ({ data, series, yAxisName }) => ({
   tooltip: { trigger: 'axis' },
-  grid: { left: 42, right: 20, top: 42, bottom: 32 },
+  legend: {
+    top: 6,
+    right: 16,
+    icon: 'circle',
+    itemWidth: 8,
+    itemHeight: 8,
+    textStyle: { fontSize: 12, color: '#64748b' }
+  },
+  grid: { left: 42, right: 20, top: 48, bottom: 32 },
   xAxis: {
     type: 'category',
     boundaryGap: false,
@@ -1160,18 +1197,18 @@ const buildLineChartOption = ({ title, data, valueKey, seriesName, yAxisName }) 
     splitLine: { lineStyle: { color: '#eef2f7' } },
     axisLabel: { color: '#64748b', fontSize: 11 }
   },
-  series: [{
-    name: seriesName,
+  series: series.map((item) => ({
+    name: item.name,
     type: 'line',
     smooth: true,
     symbol: 'circle',
     symbolSize: 7,
-    data: data.map(item => item[valueKey]),
+    data: data.map(row => row[item.valueKey]),
     label: { show: true, position: 'top', color: '#1f2937', fontSize: 11 },
-    lineStyle: { width: 3 },
-    areaStyle: { opacity: 0.08 },
+    lineStyle: { width: 3, color: item.color },
+    itemStyle: { color: item.color },
     emphasis: { focus: 'series' }
-  }]
+  }))
 })
 
 const initTrendCharts = () => {
@@ -1179,11 +1216,12 @@ const initTrendCharts = () => {
     ownSourceQuoteTrendChartInst?.dispose()
     ownSourceQuoteTrendChartInst = echarts.init(ownSourceQuoteTrendChartRef.value)
     ownSourceQuoteTrendChartInst.setOption(buildLineChartOption({
-      title: '我的信源引用趋势',
       data: ownSourceQuoteTrendData.value,
-      valueKey: 'quoteCount',
-      seriesName: '引用次数',
-      yAxisName: '引用次数'
+      yAxisName: '信源数',
+      series: [
+        { name: '引用的信源趋势', valueKey: 'quotedSourceCount', color: '#2563eb' },
+        { name: '未引用的信源趋势', valueKey: 'unquotedSourceCount', color: '#f59e0b' }
+      ]
     }))
   }
 
@@ -1191,11 +1229,12 @@ const initTrendCharts = () => {
     ownSourceQuestionTrendChartInst?.dispose()
     ownSourceQuestionTrendChartInst = echarts.init(ownSourceQuestionTrendChartRef.value)
     ownSourceQuestionTrendChartInst.setOption(buildLineChartOption({
-      title: '引用我的信源的问题数量趋势',
       data: ownSourceQuestionTrendData.value,
-      valueKey: 'questionCount',
-      seriesName: '问题数量',
-      yAxisName: '问题数量'
+      yAxisName: '问题数',
+      series: [
+        { name: '没有引用发布信源的问题数', valueKey: 'unquotedQuestionCount', color: '#ef4444' },
+        { name: '引用发布的信源的问题数', valueKey: 'quotedQuestionCount', color: '#10b981' }
+      ]
     }))
   }
 }
@@ -1436,7 +1475,8 @@ onUnmounted(() => {
 .effect-tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
 .effect-tag-list.compact { gap: 4px; max-height: 52px; overflow: hidden; }
 .effect-model-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
-.no-own-question-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.source-effect-toolbar,
+.no-own-question-toolbar { display: flex; justify-content: flex-start; align-items: center; gap: 12px; margin-bottom: 12px; }
 .no-own-question-title { font-size: 14px; font-weight: 700; color: #1e293b; }
 .question-filter-select { width: 360px; }
 

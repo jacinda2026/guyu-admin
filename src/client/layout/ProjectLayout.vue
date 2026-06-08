@@ -51,7 +51,7 @@
           <el-menu-item :index="`/project/${projectId}/config/issue`">问题配置</el-menu-item>
           <el-menu-item :index="`/project/${projectId}/config/competitor`">竞品配置</el-menu-item>
           <el-menu-item :index="`/project/${projectId}/config/monitor`">监控配置</el-menu-item>
-          <el-menu-item :index="`/project/${projectId}/config/source`">我的信源</el-menu-item>
+          <el-menu-item :index="`/project/${projectId}/config/source`">发布信源</el-menu-item>
         </el-menu-item-group>
       </el-menu>
 
@@ -227,18 +227,18 @@ const analysisGuides = {
   },
   sourceConfig: {
     title: '信源管理智能分析',
-    subtitle: '自有信源库与全网真实引用差异',
+    subtitle: '发布信源库与全网真实引用差异',
     heading: '可以直接分析信源布局问题',
-    description: '我会围绕自有信源库、全网采集信源、引用次数、关联问题和关联模型，分析哪些信源还需要补齐、哪些高频信源尚未布局，以及真实引用和自有布局之间的差距。',
+    description: '我会围绕发布信源库、全网采集信源、引用次数、关联问题和关联模型，分析哪些信源还需要补齐、哪些高频信源尚未布局，以及真实引用和发布布局之间的差距。',
     points: [
-      '判断自有信源库还缺哪些官网、百科、测评、社媒或电商信源',
+      '判断发布信源库还缺哪些官网、百科、测评、社媒或电商信源',
       '识别全网采集信源里引用次数高但尚未布局的信源',
-      '对比自有信源和大模型回答真实引用之间的平台、问题和模型差异'
+      '对比发布信源和大模型回答真实引用之间的平台、问题和模型差异'
     ],
     prompts: [
       '我还需要完善哪些信源？',
       '哪些全网高频信源还没有布局？',
-      '我的信源和全网真实引用之间差在哪里？'
+      '发布信源和全网真实引用之间差在哪里？'
     ],
     placeholder: '输入信源管理问题，例如：哪些全网高频信源还没有布局？'
   },
@@ -435,7 +435,7 @@ const currentPageTitle = computed(() => {
   const path = route.path
   if (path.includes('/config/issue')) return '问题配置'
   if (path.includes('/config/competitor')) return '竞品配置'
-  if (path.includes('/config/source')) return '我的信源'
+  if (path.includes('/config/source')) return '发布信源'
   if (path.includes('/config/monitor')) return '监控配置'
   if (path.includes('/dashboard')) return '数据概览'
   if (path.includes('/sources')) return '信源统计'

@@ -107,7 +107,7 @@
           <h2>文章关联问题列表</h2>
           <p>当前展示「{{ relatedSourceTitle || '该文章' }}」下关联的监控问题。</p>
         </div>
-        <el-button text type="primary" @click="backToSourceManagement">返回我的信源</el-button>
+        <el-button text type="primary" @click="backToSourceManagement">返回发布信源</el-button>
       </div>
 
       <div v-if="!hasRelatedQuestionFilter" class="page-toolbar">
