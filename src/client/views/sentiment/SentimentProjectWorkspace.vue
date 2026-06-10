@@ -16,8 +16,7 @@
         <div class="info-item"><span>今日任务进度：</span><strong>36/72</strong></div>
       </div>
       <div class="info-group actions">
-        <el-tag type="danger" effect="dark" size="large">持续监测</el-tag>
-        <el-button plain>立即执行</el-button>
+        <el-button plain>手动执行 </el-button>
       </div>
     </div>
 
@@ -82,16 +81,16 @@
             <template #header>
               <div class="card-head">
                 <div>
-                  <span>舆情线索池</span>
-                  <small>区分新增信源线索和长期影响 AI 认知的线索</small>
+                  <span>重点舆情问题</span>
+                  <small>聚合新增信源问题和影响 AI 认知的问题</small>
                 </div>
                 <button class="view-link" @click="goClueList">查看全部 →</button>
               </div>
             </template>
             <el-tabs v-model="cluePoolActiveTab" class="clue-tabs compact-tabs">
-              <el-tab-pane label="新增信源线索" name="new">
+              <el-tab-pane label="新增信源问题" name="new">
                 <el-table :data="opinionClueRows.slice(0, 8)" stripe size="small" :header-cell-style="headerCellStyle">
-                  <el-table-column prop="clue" label="舆情线索" min-width="150" show-overflow-tooltip>
+                  <el-table-column prop="clue" label="重点舆情问题" min-width="150" show-overflow-tooltip>
                     <template #default="{ row }">
                       <strong class="clue-title">{{ row.clue }}</strong>
                     </template>
@@ -134,9 +133,9 @@
                   </el-table-column>
                 </el-table>
               </el-tab-pane>
-              <el-tab-pane label="AI舆情线索" name="ai">
+              <el-tab-pane label="AI认知问题" name="ai">
                 <el-table :data="aiOpinionClueRows.slice(0, 8)" stripe size="small" :header-cell-style="headerCellStyle">
-                  <el-table-column prop="clue" label="AI线索名称" min-width="150" show-overflow-tooltip>
+                  <el-table-column prop="clue" label="AI问题名称" min-width="150" show-overflow-tooltip>
                     <template #default="{ row }">
                       <strong class="clue-title">{{ row.clue }}</strong>
                     </template>
@@ -257,8 +256,7 @@
     <template v-else-if="section === 'clues'">
       <div class="real-time-header">
         <div>
-          <h2>舆情线索</h2>
-          <p>系统自动聚合新增信源线索与长期影响 AI 认知的舆情线索，辅助判断专项分析和预警优先级</p>
+          <p>系统自动聚合新增信源问题与长期影响 AI 认知的重点舆情问题，辅助判断专项分析和预警优先级</p>
         </div>
       </div>
 
@@ -282,14 +280,14 @@
           <el-option label="中风险" value="中" />
           <el-option label="低风险" value="低" />
         </el-select>
-        <span class="clue-filter-note">模型筛选主要影响 AI 舆情线索，时间和风险筛选影响全部线索。</span>
+        <span class="clue-filter-note">模型筛选主要影响 AI 重点舆情问题，时间和风险筛选影响全部问题。</span>
       </div>
 
       <el-card shadow="never" class="content-card clue-pool-card mb-16">
         <el-tabs v-model="cluePoolActiveTab" class="clue-tabs">
-          <el-tab-pane label="新增信源线索" name="new">
+          <el-tab-pane label="新增信源问题" name="new">
             <el-table :data="filteredOpinionClueRows" stripe size="small" :header-cell-style="headerCellStyle">
-              <el-table-column prop="clue" label="舆情线索" min-width="150" show-overflow-tooltip>
+              <el-table-column prop="clue" label="重点舆情问题" min-width="150" show-overflow-tooltip>
                 <template #default="{ row }">
                   <strong class="clue-title">{{ row.clue }}</strong>
                 </template>
@@ -334,9 +332,9 @@
               </el-table-column>
             </el-table>
           </el-tab-pane>
-          <el-tab-pane label="AI舆情线索" name="ai">
+          <el-tab-pane label="AI认知问题" name="ai">
             <el-table :data="filteredAiOpinionClueRows" stripe size="small" :header-cell-style="headerCellStyle">
-              <el-table-column prop="clue" label="AI线索名称" min-width="160" show-overflow-tooltip>
+              <el-table-column prop="clue" label="AI问题名称" min-width="160" show-overflow-tooltip>
                 <template #default="{ row }">
                   <strong class="clue-title">{{ row.clue }}</strong>
                 </template>
@@ -423,7 +421,7 @@
                 <h3>{{ item.title }}</h3>
                 <p>{{ item.summary }}</p>
                 <div class="feed-linked-row">
-                  <span>关联线索</span>
+                  <span>关联问题</span>
                   <button type="button" @click="openRealtimeClue(item)">{{ item.clue }}</button>
                   <span>数据来源：{{ item.dataSource }}</span>
                 </div>
@@ -442,7 +440,7 @@
                 <span class="title-with-help">
                   今日舆情发酵趋势
                   <el-tooltip
-                    content="按当天新增信源和模型巡检结果聚合。高风险包括高权重信源、风险关键词命中、被多模型引用或归属高风险线索的内容；中低风险包括中低风险信源、模型回答和正向澄清内容。"
+                    content="按当天新增信源和模型巡检结果聚合。高风险包括高权重信源、风险关键词命中、被多模型引用或归属高风险问题的内容；中低风险包括中低风险信源、模型回答和正向澄清内容。"
                     placement="top"
                   >
                     <el-icon><QuestionFilled /></el-icon>
@@ -475,7 +473,7 @@
               <div class="card-head">
                 <div class="card-title-stack">
                   <span>典型高危舆情扩散路径</span>
-                  <small>基于动态流中最高风险线索：{{ spreadPathClueName }}</small>
+                  <small>基于动态流中最高风险问题：{{ spreadPathClueName }}</small>
                 </div>
               </div>
             </template>
@@ -500,7 +498,7 @@
           <div class="card-head">
             <div class="card-title-stack">
               <span>{{ currentClueDetail.clue }}</span>
-              <small>{{ currentClueDetail.type === 'ai' ? 'AI 舆情线索' : '新增信源线索' }}</small>
+              <small>{{ currentClueDetail.type === 'ai' ? 'AI 重点舆情问题' : '新增信源问题' }}</small>
             </div>
             <el-tag :type="currentClueDetail.riskLevel === '高' ? 'danger' : currentClueDetail.riskLevel === '中' ? 'warning' : 'info'" effect="plain">
               {{ currentClueDetail.riskLevel }}
@@ -571,7 +569,7 @@
           <div class="card-head">
             <div class="card-title-stack">
               <span>信源列表</span>
-              <small v-if="sourceListClue">当前线索：{{ sourceListClue }}</small>
+              <small v-if="sourceListClue">当前问题：{{ sourceListClue }}</small>
             </div>
             <div class="toolbar-actions">
               <el-input v-model="sourceListKeyword" size="small" placeholder="搜索平台、账号、内容" clearable style="width: 220px" />
@@ -1965,7 +1963,7 @@ const overviewCards = computed(() => [
     ]
   },
   {
-    label: '舆情线索',
+    label: '重点舆情问题',
     value: filteredSummary.value.clues,
     desc: '系统聚合出的重点风险问题',
     type: 'primary',
@@ -2120,7 +2118,7 @@ const filteredRealTimeFeeds = computed(() => {
   return realTimeFeedItems
 })
 
-const spreadPathClueName = computed(() => realTimeFeedItems.find(item => item.riskType === 'high')?.clue || '当前最高风险线索')
+const spreadPathClueName = computed(() => realTimeFeedItems.find(item => item.riskType === 'high')?.clue || '当前最高风险问题')
 
 const realTimeTrendItems = [
   { time: '08:00', high: 2, medium: 8 },
@@ -2561,19 +2559,19 @@ const currentCluePlatforms = computed(() => {
 const clueSeverityCards = computed(() => [
   { label: '新增信源数', value: currentClueDetail.value.newSourceCount || 0, desc: '最近周期新增内容数量', type: 'primary' },
   { label: '高权重信源数', value: currentClueDetail.value.highWeightSourceCount || 0, desc: 'S/A 级信源或重点平台数量', type: 'danger' },
-  { label: '关联问题', value: currentClueDetail.value.quoteCount || currentClueDetail.value.aiQuoteCount || 0, desc: '当前时间段内命中该线索的大模型问题数', type: 'warning' },
-  { label: '影响模型数', value: currentClueDetail.value.modelCount || 0, desc: '受该线索影响的大模型数量', type: 'primary' },
+  { label: '关联问题', value: currentClueDetail.value.quoteCount || currentClueDetail.value.aiQuoteCount || 0, desc: '当前时间段内命中该问题的大模型问题数', type: 'warning' },
+  { label: '影响模型数', value: currentClueDetail.value.modelCount || 0, desc: '受该问题影响的大模型数量', type: 'primary' },
   { label: '负面声量', value: currentClueDetail.value.negativeVolume || 0, desc: '负面内容和负面表达聚合量', type: 'danger' },
   { label: '最近活跃时间', value: currentClueDetail.value.recentActiveAt || currentClueDetail.value.lastQuotedAt || '-', desc: '最近一次发布或引用时间', type: 'primary' }
 ])
 
 const clueSeverityRows = computed(() => [
-  { label: '新增信源数', value: currentClueDetail.value.newSourceCount || 0, desc: '用于判断线索是否正在发酵，新增越多优先级越高。' },
+  { label: '新增信源数', value: currentClueDetail.value.newSourceCount || 0, desc: '用于判断问题是否正在发酵，新增越多优先级越高。' },
   { label: '高权重信源数', value: currentClueDetail.value.highWeightSourceCount || 0, desc: '用于判断传播影响力，汽车垂媒、投诉平台、新闻媒体权重更高。' },
-  { label: '关联问题', value: currentClueDetail.value.quoteCount || currentClueDetail.value.aiQuoteCount || 0, desc: '用于判断该线索是否已经影响大模型问题回答。' },
+  { label: '关联问题', value: currentClueDetail.value.quoteCount || currentClueDetail.value.aiQuoteCount || 0, desc: '用于判断该问题是否已经影响大模型问题回答。' },
   { label: '影响模型数', value: currentClueDetail.value.modelCount || 0, desc: '用于判断风险是否跨模型扩散。' },
   { label: '负面声量', value: currentClueDetail.value.negativeVolume || 0, desc: '用于判断用户讨论和负面表达规模。' },
-  { label: '最近活跃时间', value: currentClueDetail.value.recentActiveAt || currentClueDetail.value.lastQuotedAt || '-', desc: '用于判断该线索是否仍在活跃。' }
+  { label: '最近活跃时间', value: currentClueDetail.value.recentActiveAt || currentClueDetail.value.lastQuotedAt || '-', desc: '用于判断该问题是否仍在活跃。' }
 ])
 
 const goSourceStats = (platform = '') => {
@@ -3415,7 +3413,7 @@ const monitorTasks = [
   { id: 'SEN-T2403', name: '每日舆情采集任务', questionCount: 36, modelList: ['DeepSeek', '豆包', 'Kimi', '通义千问', '文心一言', '腾讯元宝'], negativeRate: '68%', negativeRateValue: 68, riskSources: 18, trigger: 'schedule', triggerText: '定时任务', status: 'running', startTime: '2026-05-29 18:30', endTime: '', result: '正在采集高权重信源与模型回答' },
   { id: 'SEN-T2402', name: '高风险问题复测任务', questionCount: 11, modelList: ['DeepSeek', '豆包', '通义千问'], negativeRate: '72%', negativeRateValue: 72, riskSources: 9, trigger: 'retest', triggerText: '复测任务', status: 'done', startTime: '2026-05-29 10:00', endTime: '2026-05-29 10:18', result: '换壳认知固化仍被 3 个模型引用' },
   { id: 'SEN-T2401', name: '每日舆情采集任务', questionCount: 36, modelList: ['DeepSeek', '豆包', 'Kimi', '通义千问', '文心一言', '腾讯元宝'], negativeRate: '68%', negativeRateValue: 68, riskSources: 18, trigger: 'schedule', triggerText: '定时任务', status: 'done', startTime: '2026-05-29 02:00', endTime: '2026-05-29 02:26', result: '新增 3 条高风险信源' },
-  { id: 'SEN-T2400', name: '手动补充采集任务', questionCount: 36, modelList: ['DeepSeek', '豆包', 'Kimi', '通义千问', '文心一言', '腾讯元宝'], negativeRate: '64%', negativeRateValue: 64, riskSources: 15, trigger: 'manual', triggerText: '手动执行', status: 'done', startTime: '2026-05-28 18:30', endTime: '2026-05-28 18:55', result: '新增 2 条舆情线索，风险信源集中在汽车社区' },
+  { id: 'SEN-T2400', name: '手动补充采集任务', questionCount: 36, modelList: ['DeepSeek', '豆包', 'Kimi', '通义千问', '文心一言', '腾讯元宝'], negativeRate: '64%', negativeRateValue: 64, riskSources: 15, trigger: 'manual', triggerText: '手动执行', status: 'done', startTime: '2026-05-28 18:30', endTime: '2026-05-28 18:55', result: '新增 2 条重点舆情问题，风险信源集中在汽车社区' },
   { id: 'SEN-T2399', name: '每日舆情采集任务', questionCount: 36, modelList: ['DeepSeek', '豆包', 'Kimi', '通义千问', '文心一言'], negativeRate: '61%', negativeRateValue: 61, riskSources: 14, trigger: 'schedule', triggerText: '定时任务', status: 'failed', startTime: '2026-05-28 02:00', endTime: '2026-05-28 02:08', result: 'Kimi 采集失败 2 次' }
 ]
 

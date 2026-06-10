@@ -39,7 +39,7 @@
           </template>
           <el-menu-item :index="`/sentiment-project/${projectId}/overview`">舆情概览</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/real-time`">实时舆情【先不做】</el-menu-item>
-          <el-menu-item :index="`/sentiment-project/${projectId}/clues`">舆情线索</el-menu-item>
+          <el-menu-item :index="`/sentiment-project/${projectId}/clues`">舆情问题</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/sources`">信源列表</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/question-list`">问题列表</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/conversations`">对话管理</el-menu-item>
@@ -78,15 +78,14 @@
               <button type="button" class="breadcrumb-link" @click="goQuestionList">问题列表</button>
             </el-breadcrumb-item>
             <el-breadcrumb-item v-else-if="isClueDetailPage">
-              <button type="button" class="breadcrumb-link" @click="goClues">舆情线索</button>
+              <button type="button" class="breadcrumb-link" @click="goClues">重点舆情问题</button>
             </el-breadcrumb-item>
             <el-breadcrumb-item v-else>{{ currentPageTitle }}</el-breadcrumb-item>
             <el-breadcrumb-item v-if="isQuestionDetailPage">问题</el-breadcrumb-item>
-            <el-breadcrumb-item v-if="isClueDetailPage">线索</el-breadcrumb-item>
+            <el-breadcrumb-item v-if="isClueDetailPage">重点问题</el-breadcrumb-item>
           </el-breadcrumb>
         </div>
         <div class="header-right">
-          <el-tag type="danger" effect="plain">持续监测</el-tag>
           <el-tooltip content="返回舆情项目列表" placement="bottom">
             <el-icon class="home-btn" @click="goSentimentList"><House /></el-icon>
           </el-tooltip>
@@ -123,11 +122,11 @@ const projectOptions = [
 const pageTitleMap = {
   overview: '舆情概览',
   'real-time': '实时舆情',
-  clues: '舆情线索',
+  clues: '重点舆情问题',
   sources: '信源列表',
   'question-list': '问题列表',
   'question-detail': '问题详情',
-  'clue-detail': '线索详情',
+  'clue-detail': '重点问题详情',
   'risk-sources': '风险信源',
   conversations: '对话管理',
   questions: '舆情问题',
