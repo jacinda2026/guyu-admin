@@ -56,7 +56,9 @@
                 </button>
               </template>
               <div class="time-panel">
-                <button type="button" :class="{ active: timeRangeType === '7d' }" @click="setQuickRange('7d')">最近7天</button>
+                <el-tooltip content="最近7天的引用次数" placement="right" :show-after="150">
+                  <button type="button" :class="{ active: timeRangeType === '7d' }" @click="setQuickRange('7d')">最近7天</button>
+                </el-tooltip>
                 <button type="button" :class="{ active: timeRangeType === '30d' }" @click="setQuickRange('30d')">最近30天</button>
                 <div class="time-panel-divider"></div>
                 <div class="date-range-editor">
@@ -135,11 +137,6 @@
               </template>
             </el-table-column>
             <el-table-column prop="rangeCount" label="引用次数" width="92" align="center" />
-            <el-table-column prop="weight" label="权威等级" width="96" align="center">
-              <template #default="{ row }">
-                <el-tag :type="weightTagType(row.weight)" effect="plain">{{ row.weight }}</el-tag>
-              </template>
-            </el-table-column>
             <el-table-column prop="status" label="当前状态" width="98" align="center">
               <template #default="{ row }">
                 <el-tag :type="sourceStatusTagType(row.status)" effect="plain">{{ row.status }}</el-tag>
@@ -177,7 +174,9 @@
                 </button>
               </template>
               <div class="time-panel">
-                <button type="button" :class="{ active: timeRangeType === '7d' }" @click="setQuickRange('7d')">最近7天</button>
+                <el-tooltip content="最近7天的引用次数" placement="right" :show-after="150">
+                  <button type="button" :class="{ active: timeRangeType === '7d' }" @click="setQuickRange('7d')">最近7天</button>
+                </el-tooltip>
                 <button type="button" :class="{ active: timeRangeType === '30d' }" @click="setQuickRange('30d')">最近30天</button>
                 <div class="time-panel-divider"></div>
                 <div class="date-range-editor">
@@ -318,7 +317,7 @@
         <el-upload drag action="#" :auto-upload="false" accept=".xlsx,.xls,.csv">
           <el-icon class="upload-icon"><UploadFilled /></el-icon>
           <div class="upload-title">将 Excel / CSV 文件拖到此处，或点击上传</div>
-          <div class="upload-desc">字段建议：文章标题、URL/域名、平台、信源类型、所属品牌、权威等级、关联问题、关联模型、当前状态</div>
+          <div class="upload-desc">字段建议：文章标题、URL/域名、平台、信源类型、所属品牌、关联问题、关联模型、当前状态</div>
         </el-upload>
         <el-input
           v-model="batchText"
@@ -387,7 +386,6 @@ const sourceForm = reactive({
   content: '',
   type: '官网',
   category: '本品',
-  weight: 'A级',
   relatedQuestions: [],
   relatedModels: [],
   status: '未收录'
@@ -712,12 +710,6 @@ watch([collectedKeyword, sentimentFilter, categoryFilter], () => {
 
 const headerCellStyle = { background: '#f8fafc', color: '#334155', fontWeight: 800 }
 
-const weightTagType = (weight) => {
-  if (weight === 'A级') return 'warning'
-  if (weight === 'B级') return 'primary'
-  return 'info'
-}
-
 const sentimentTagType = (sentiment) => {
   if (sentiment === '负面') return 'danger'
   if (sentiment === '正面') return 'success'
@@ -770,7 +762,6 @@ const resetSourceForm = () => {
   sourceForm.content = ''
   sourceForm.type = '官网'
   sourceForm.category = '本品'
-  sourceForm.weight = 'A级'
   sourceForm.relatedQuestions = []
   sourceForm.relatedModels = []
   sourceForm.status = '未收录'
@@ -790,7 +781,6 @@ const openSourceDialog = (row) => {
     sourceForm.content = row.content || ''
     sourceForm.type = row.type
     sourceForm.category = row.category
-    sourceForm.weight = row.weight
     sourceForm.relatedQuestions = [...(row.relatedQuestions || [])]
     sourceForm.relatedModels = [...(row.relatedModels || [])]
     sourceForm.status = row.status
@@ -864,7 +854,6 @@ const confirmImport = () => {
       platform = '',
       type = '官网',
       category = '本品',
-      weight = 'B级',
       questions = '',
       models = '',
       status = '未收录'
@@ -884,7 +873,6 @@ const confirmImport = () => {
       category,
       match,
       domain,
-      weight,
       relatedQuestions: questions ? questions.split(';').map(item => item.trim()).filter(Boolean) : [],
       relatedModels: models ? models.split(';').map(item => item.trim()).filter(Boolean) : [],
       status,
@@ -898,7 +886,7 @@ const confirmImport = () => {
 }
 
 const downloadTemplate = () => {
-  ElMessage.success('模板字段：文章标题、URL/域名、平台、信源类型、所属品牌、权威等级、关联问题、关联模型、当前状态')
+  ElMessage.success('模板字段：文章标题、URL/域名、平台、信源类型、所属品牌、关联问题、关联模型、当前状态')
 }
 
 const dedupeSources = () => {
@@ -946,8 +934,12 @@ const dedupeCollectedSources = () => {
 .time-trigger:hover { border-color: #93c5fd; color: #2563eb; }
 .trigger-caret { color: #64748b; font-size: 12px; }
 .time-panel { display: flex; flex-direction: column; gap: 4px; padding: 4px; }
-.time-panel > button { height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #111827; text-align: left; font-size: 13px; cursor: pointer; }
-.time-panel > button:hover, .time-panel > button.active { background: #eff6ff; color: #2563eb; font-weight: 800; }
+.time-panel > button,
+.time-panel :deep(.el-tooltip__trigger) { width: 100%; height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #111827; text-align: left; font-size: 13px; cursor: pointer; }
+.time-panel > button:hover,
+.time-panel > button.active,
+.time-panel :deep(.el-tooltip__trigger:hover),
+.time-panel :deep(.el-tooltip__trigger.active) { background: #eff6ff; color: #2563eb; font-weight: 800; }
 .time-panel-divider { height: 1px; margin: 6px 0; background: #e5e7eb; }
 .date-range-editor { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 4px; color: #64748b; font-size: 12px; }
 .date-range-editor input { height: 32px; border: 1px solid #dbe3ef; border-radius: 7px; padding: 0 8px; color: #111827; font-family: inherit; }
