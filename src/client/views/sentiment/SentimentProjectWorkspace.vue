@@ -2,7 +2,7 @@
   <div class="sentiment-workspace">
     <div v-if="section === 'overview'" class="project-info-header">
       <div class="info-group">
-        <div class="info-item"><span>监控主体：</span><strong>{{ currentProject.name }}</strong></div>
+        <div class="info-item"><span>监控主体：</span><strong>{{ currentProject.targetName }}</strong></div>
         <div class="info-item"><span>舆情问题：</span><strong>36</strong></div>
         <div class="info-item"><span>数据更新：</span><strong>09:30:00</strong></div>
       </div>
@@ -1193,7 +1193,7 @@
       <div class="page-toolbar">
         <div>
           <h2>监控主体</h2>
-          <p>配置舆情项目的品牌、产品、事件主体，以及别名、关联实体和风险维度。</p>
+          <p>配置舆情项目的品牌、产品或事件主体。</p>
         </div>
         <el-button type="primary" @click="handleSubjectEditSave">{{ subjectEditing ? '保存' : '编辑' }}</el-button>
       </div>
@@ -1201,81 +1201,17 @@
       <el-card shadow="never" class="content-card">
         <el-form :model="subjectForm" label-width="104px" class="subject-form">
           <el-row :gutter="14">
-            <el-col :span="12">
-              <el-form-item label="主体名称" required>
-                <el-input v-model="subjectForm.name" :disabled="!subjectEditing" placeholder="请输入品牌、产品或事件名称" />
+            <el-col :span="24">
+              <el-form-item label="项目名称">
+                <el-input v-model="subjectForm.projectName" :disabled="!subjectEditing" class="subject-short-input" placeholder="请输入项目名称" />
               </el-form-item>
             </el-col>
-            <el-col :span="12">
-              <el-form-item label="主体类型" required>
-                <el-select v-model="subjectForm.type" :disabled="!subjectEditing" style="width: 100%">
-                  <el-option label="品牌舆情" value="brand" />
-                  <el-option label="产品舆情" value="product" />
-                  <el-option label="人物舆情" value="person" />
-                  <el-option label="机构舆情" value="organization" />
-                  <el-option label="事件专项" value="event" />
-                </el-select>
+            <el-col :span="24">
+              <el-form-item label="检测主体">
+                <el-input v-model="subjectForm.targetName" :disabled="!subjectEditing" class="subject-short-input" placeholder="请输入品牌、产品或事件名称" />
               </el-form-item>
             </el-col>
           </el-row>
-
-          <el-form-item label="监控别名">
-            <el-select
-              v-model="subjectForm.aliases"
-              :disabled="!subjectEditing"
-              multiple
-              filterable
-              allow-create
-              default-first-option
-              style="width: 100%"
-              placeholder="输入别名后回车，例如 奥迪E7X、Audi E7X"
-            />
-          </el-form-item>
-
-          <el-form-item label="关联实体">
-            <el-select
-              v-model="subjectForm.entities"
-              :disabled="!subjectEditing"
-              multiple
-              filterable
-              allow-create
-              default-first-option
-              style="width: 100%"
-              placeholder="输入关联品牌、车型、竞品或人物"
-            />
-          </el-form-item>
-
-          <el-form-item label="监控范围">
-            <el-checkbox-group v-model="subjectForm.scopes" :disabled="!subjectEditing" class="scope-grid">
-              <el-checkbox label="AI回答">AI回答</el-checkbox>
-              <el-checkbox label="新闻媒体">新闻媒体</el-checkbox>
-              <el-checkbox label="问答平台">问答平台</el-checkbox>
-              <el-checkbox label="论坛社区">论坛社区</el-checkbox>
-              <el-checkbox label="短视频评论">短视频评论</el-checkbox>
-              <el-checkbox label="电商评价">电商评价</el-checkbox>
-            </el-checkbox-group>
-          </el-form-item>
-
-          <el-form-item label="风险维度">
-            <el-checkbox-group v-model="subjectForm.riskDimensions" :disabled="!subjectEditing" class="scope-grid">
-              <el-checkbox label="事件核查">事件核查</el-checkbox>
-              <el-checkbox label="负面舆情">负面舆情</el-checkbox>
-              <el-checkbox label="用户投诉">用户投诉</el-checkbox>
-              <el-checkbox label="质量质疑">质量质疑</el-checkbox>
-              <el-checkbox label="购买影响">购买影响</el-checkbox>
-              <el-checkbox label="处置建议">处置建议</el-checkbox>
-            </el-checkbox-group>
-          </el-form-item>
-
-          <el-form-item label="背景说明">
-            <el-input
-              v-model="subjectForm.background"
-              :disabled="!subjectEditing"
-              type="textarea"
-              :rows="4"
-              placeholder="补充主体背景、争议来源、关注重点和监控口径"
-            />
-          </el-form-item>
         </el-form>
       </el-card>
     </template>
@@ -1284,7 +1220,7 @@
       <section class="issue-config-panel">
         <div class="issue-config-header">
           <div>
-            <h2>舆情问题配置</h2>
+            <h2>提问配置</h2>
             <p>配置需要持续监控的舆情问题方向，按风险标签分组管理。</p>
           </div>
           <el-button type="primary" @click="handleIssueEditSave">{{ issueEditing ? '保存' : '编辑' }}</el-button>
@@ -1366,88 +1302,6 @@
             <div class="issue-pagination">
               <span>共 {{ issuePrompts.length }} 条问题</span>
               <el-pagination background layout="prev, pager, next, sizes" :total="issuePrompts.length" :page-size="10" />
-            </div>
-          </main>
-        </div>
-      </section>
-    </template>
-
-    <template v-else-if="section === 'config' && configPage === 'risk'">
-      <section class="risk-keyword-panel">
-        <div class="issue-config-header">
-          <div>
-            <h2>风险词库配置</h2>
-            <p>维护用于匹配和预警的风险关键词，不是检测结果。命中词库后用于标记重点风险和触发预警。</p>
-          </div>
-          <el-button type="primary" @click="handleRiskEditSave">{{ riskEditing ? '保存' : '编辑' }}</el-button>
-        </div>
-
-        <div class="risk-layout">
-          <aside class="issue-category-panel">
-            <div class="issue-category-top">
-              <el-input v-model="riskCategoryKeyword" placeholder="搜索分类" :prefix-icon="Search" clearable />
-              <el-button v-if="riskEditing" type="primary" size="small" @click="riskCategoryDialogVisible = true">+ 分类</el-button>
-            </div>
-            <div class="issue-category-list">
-              <button type="button" class="issue-category all" :class="{ selected: activeRiskCategory === '全部' }" @click="activeRiskCategory = '全部'">
-                <span>全部</span>
-                <strong>{{ riskKeywords.length }}</strong>
-              </button>
-              <button
-                v-for="category in filteredRiskCategories"
-                :key="category.name"
-                type="button"
-                class="issue-category"
-                :class="{ selected: activeRiskCategory === category.name }"
-                @click="activeRiskCategory = category.name"
-              >
-                <i :style="{ background: category.color }"></i>
-                <span>{{ category.name }}</span>
-                <strong>{{ category.count }}</strong>
-              </button>
-            </div>
-          </aside>
-
-          <main class="risk-table-panel">
-            <div class="issue-toolbar">
-              <el-input v-model="riskKeyword" class="issue-search" placeholder="搜索风险词" :prefix-icon="Search" clearable />
-              <div v-if="riskEditing" class="issue-actions">
-                <el-button size="small" type="primary" @click="openRiskKeywordDialog()">+ 添加词条</el-button>
-              </div>
-            </div>
-
-            <el-table :data="filteredRiskKeywords" class="issue-table" :header-cell-style="headerCellStyle">
-              <el-table-column type="index" label="#" width="44" />
-              <el-table-column prop="word" label="风险词" min-width="160" />
-              <el-table-column prop="category" label="分类" width="120">
-                <template #default="{ row }">
-                  <el-tag size="small" effect="plain">{{ row.category }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="level" label="预警级别" width="110" align="center">
-                <template #default="{ row }">
-                  <el-tag size="small" :type="row.level === '高' ? 'danger' : row.level === '中' ? 'warning' : 'info'" effect="plain">{{ row.level }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="matchType" label="匹配方式" width="110" align="center" />
-              <el-table-column prop="remark" label="说明" min-width="220" show-overflow-tooltip />
-              <el-table-column label="状态" width="90" align="center">
-                <template #default="{ row }">
-                  <span class="issue-status" :class="row.status">{{ row.status === 'enabled' ? '启用' : '停用' }}</span>
-                </template>
-              </el-table-column>
-              <el-table-column v-if="riskEditing" label="操作" width="160" align="center">
-                <template #default="{ row }">
-                  <el-button link type="primary" @click="openRiskKeywordDialog(row)">编辑</el-button>
-                  <el-button link type="primary" @click="toggleRiskKeyword(row)">{{ row.status === 'enabled' ? '停用' : '启用' }}</el-button>
-                  <el-button link type="primary" @click="removeRiskKeyword(row)">删除</el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-
-            <div class="issue-pagination">
-              <span>共 {{ riskKeywords.length }} 个风险词</span>
-              <el-pagination background layout="prev, pager, next, sizes" :total="riskKeywords.length" :page-size="10" />
             </div>
           </main>
         </div>
@@ -1681,19 +1535,6 @@
             <p>{{ item.desc }}</p>
             <div v-if="item.page === 'subject'" class="subject-summary">
               <div><span>主体名称</span><strong>{{ subjectConfig.name }}</strong></div>
-              <div><span>主体类型</span><strong>{{ subjectTypeLabel }}</strong></div>
-              <div class="summary-wide">
-                <span>监控别名</span>
-                <div class="tag-list">
-                  <el-tag v-for="alias in subjectConfig.aliases" :key="alias" size="small" effect="plain">{{ alias }}</el-tag>
-                </div>
-              </div>
-              <div class="summary-wide">
-                <span>风险维度</span>
-                <div class="tag-list">
-                  <el-tag v-for="dimension in subjectConfig.riskDimensions" :key="dimension" size="small" type="warning" effect="plain">{{ dimension }}</el-tag>
-                </div>
-              </div>
             </div>
             <el-button size="small" type="primary" plain @click="openConfigDialog(item)">配置</el-button>
           </el-card>
@@ -1769,78 +1610,17 @@
     <el-dialog v-model="subjectDialogVisible" title="监控主体配置" width="720px" destroy-on-close>
       <el-form :model="subjectForm" label-width="104px" class="subject-form">
         <el-row :gutter="14">
-          <el-col :span="12">
-            <el-form-item label="主体名称" required>
-              <el-input v-model="subjectForm.name" placeholder="请输入品牌、产品或事件名称" />
+          <el-col :span="24">
+            <el-form-item label="项目名称">
+              <el-input v-model="subjectForm.projectName" class="subject-short-input" placeholder="请输入项目名称" />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="主体类型" required>
-              <el-select v-model="subjectForm.type" style="width: 100%">
-                <el-option label="品牌舆情" value="brand" />
-                <el-option label="产品舆情" value="product" />
-                <el-option label="人物舆情" value="person" />
-                <el-option label="机构舆情" value="organization" />
-                <el-option label="事件专项" value="event" />
-              </el-select>
+          <el-col :span="24">
+            <el-form-item label="检测主体">
+              <el-input v-model="subjectForm.targetName" class="subject-short-input" placeholder="请输入品牌、产品或事件名称" />
             </el-form-item>
           </el-col>
         </el-row>
-
-        <el-form-item label="监控别名">
-          <el-select
-            v-model="subjectForm.aliases"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            style="width: 100%"
-            placeholder="输入别名后回车，例如 奥迪E7X、Audi E7X"
-          />
-        </el-form-item>
-
-        <el-form-item label="关联实体">
-          <el-select
-            v-model="subjectForm.entities"
-            multiple
-            filterable
-            allow-create
-            default-first-option
-            style="width: 100%"
-            placeholder="输入关联品牌、车型、竞品或人物"
-          />
-        </el-form-item>
-
-        <el-form-item label="监控范围">
-          <el-checkbox-group v-model="subjectForm.scopes" class="scope-grid">
-            <el-checkbox label="AI回答">AI回答</el-checkbox>
-            <el-checkbox label="新闻媒体">新闻媒体</el-checkbox>
-            <el-checkbox label="问答平台">问答平台</el-checkbox>
-            <el-checkbox label="论坛社区">论坛社区</el-checkbox>
-            <el-checkbox label="短视频评论">短视频评论</el-checkbox>
-            <el-checkbox label="电商评价">电商评价</el-checkbox>
-          </el-checkbox-group>
-        </el-form-item>
-
-        <el-form-item label="风险维度">
-          <el-checkbox-group v-model="subjectForm.riskDimensions" class="scope-grid">
-            <el-checkbox label="事件核查">事件核查</el-checkbox>
-            <el-checkbox label="负面舆情">负面舆情</el-checkbox>
-            <el-checkbox label="用户投诉">用户投诉</el-checkbox>
-            <el-checkbox label="质量质疑">质量质疑</el-checkbox>
-            <el-checkbox label="购买影响">购买影响</el-checkbox>
-            <el-checkbox label="处置建议">处置建议</el-checkbox>
-          </el-checkbox-group>
-        </el-form-item>
-
-        <el-form-item label="背景说明">
-          <el-input
-            v-model="subjectForm.background"
-            type="textarea"
-            :rows="4"
-            placeholder="补充主体背景、争议来源、关注重点和监控口径"
-          />
-        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="subjectDialogVisible = false">取消</el-button>
@@ -2071,11 +1851,14 @@ const filterState = reactive({
 
 const currentProject = reactive({
   name: '奥迪E7X与智己LS7「换壳」舆情审计项目',
+  targetName: '奥迪E7X换壳争议',
   riskLevel: '极度高危'
 })
 
 const subjectConfig = reactive({
-  name: '奥迪E7X与智己LS7「换壳」舆情审计项目',
+  projectName: '奥迪E7X与智己LS7「换壳」舆情审计项目',
+  targetName: '奥迪E7X换壳争议',
+  name: '奥迪E7X换壳争议',
   type: 'event',
   aliases: ['奥迪E7X', 'Audi E7X', '智己LS7', '换壳争议'],
   entities: ['奥迪', '智己汽车', '上汽集团', '新能源SUV'],
@@ -2085,6 +1868,8 @@ const subjectConfig = reactive({
 })
 
 const subjectForm = reactive({
+  projectName: '',
+  targetName: '',
   name: '',
   type: 'event',
   aliases: [],
@@ -2105,13 +1890,9 @@ const subjectTypeOptions = [
 const subjectTypeLabel = computed(() => subjectTypeOptions.find(item => item.value === subjectConfig.type)?.label || '事件专项')
 
 const syncSubjectForm = () => {
-  subjectForm.name = subjectConfig.name
-  subjectForm.type = subjectConfig.type
-  subjectForm.aliases = [...subjectConfig.aliases]
-  subjectForm.entities = [...subjectConfig.entities]
-  subjectForm.scopes = [...subjectConfig.scopes]
-  subjectForm.riskDimensions = [...subjectConfig.riskDimensions]
-  subjectForm.background = subjectConfig.background
+  subjectForm.projectName = subjectConfig.projectName
+  subjectForm.targetName = subjectConfig.targetName
+  subjectForm.name = subjectConfig.targetName
 }
 
 watch(configPage, (page) => {
@@ -3832,8 +3613,7 @@ const downloadTaskReport = (row) => {
 }
 
 const configItems = [
-  { title: '监控主体', page: 'subject', desc: '配置品牌、产品、人物、机构或事件专项，以及别名和关联实体。' },
-  { title: '风险词库', page: 'risk', desc: '维护负面词、争议词、投诉词、安全词和重点关注表达。' },
+  { title: '监控主体', page: 'subject', desc: '配置品牌、产品或事件主体。' },
   { title: '问题方向', page: 'issue', desc: '维护负面舆情、事件核查、用户口碑、风险归因、购买影响等问题。' },
   { title: '监控配置', page: 'monitor', desc: '配置监控周期、执行时间、大模型覆盖和采集通道。' },
   { title: '预警配置', page: 'alert', desc: '配置主体状态、预警等级、触发条件和报告生成频率。' }
@@ -3842,10 +3622,6 @@ const configItems = [
 const openConfigDialog = (item) => {
   if (item.page === 'subject') {
     router.push(`/sentiment-project/${route.params.id}/config/subject`)
-    return
-  }
-  if (item.page === 'risk') {
-    router.push(`/sentiment-project/${route.params.id}/config/risk`)
     return
   }
   if (item.page === 'issue') {
@@ -3864,14 +3640,19 @@ const openConfigDialog = (item) => {
 }
 
 const saveSubjectConfig = () => {
-  subjectConfig.name = subjectForm.name
-  subjectConfig.type = subjectForm.type
-  subjectConfig.aliases = [...subjectForm.aliases]
-  subjectConfig.entities = [...subjectForm.entities]
-  subjectConfig.scopes = [...subjectForm.scopes]
-  subjectConfig.riskDimensions = [...subjectForm.riskDimensions]
-  subjectConfig.background = subjectForm.background
-  currentProject.name = subjectConfig.name
+  if (!subjectForm.projectName.trim()) {
+    ElMessage.warning('请输入项目名称')
+    return
+  }
+  if (!subjectForm.targetName.trim()) {
+    ElMessage.warning('请输入检测主体')
+    return
+  }
+  subjectConfig.projectName = subjectForm.projectName
+  subjectConfig.targetName = subjectForm.targetName
+  subjectConfig.name = subjectForm.targetName
+  currentProject.name = subjectConfig.projectName
+  currentProject.targetName = subjectConfig.targetName
   subjectDialogVisible.value = false
   ElMessage.success('监控主体配置已保存')
 }
@@ -3909,7 +3690,7 @@ const handleIssueEditSave = async () => {
       customClass: 'billing-confirm-box'
     })
     issueEditing.value = false
-    ElMessage.success('舆情问题配置已保存')
+    ElMessage.success('问题配置已保存')
   } catch {
     // 保持编辑态
   } finally {
@@ -5113,6 +4894,7 @@ const refreshExportJobs = () => {
 .subject-summary .summary-wide { grid-column: 1 / -1; }
 .tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .subject-form :deep(.el-form-item__label) { font-weight: 700; color: #334155; }
+.subject-short-input { width: min(420px, 100%); }
 .scope-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; width: 100%; }
 .scope-grid :deep(.el-checkbox) { margin-right: 0; }
 .upload-icon { font-size: 28px; color: #409eff; }
@@ -5632,5 +5414,3 @@ const refreshExportJobs = () => {
   .actions { justify-content: flex-start; }
 }
 </style>
-
-

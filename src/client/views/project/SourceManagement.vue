@@ -294,92 +294,18 @@
 
     <el-dialog v-model="sourceDialogVisible" title="添加信源" width="720px">
       <el-form label-position="top">
-        <el-form-item label="文章标题">
-          <el-input v-model="sourceForm.name" placeholder="例如：品牌官网介绍、官方旗舰店商品页、知乎专栏文章、小红书账号主页" />
+        <el-form-item label="文章标题" required>
+          <el-input v-model="sourceForm.name" placeholder="请输入文章标题" />
         </el-form-item>
-        <el-form-item label="信源 URL / 域名">
-          <el-input v-model="sourceForm.match" placeholder="支持完整 URL，也支持域名级别，例如 https://example.com/news 或 example.com" @blur="sourceForm.domain = parseDomain(sourceForm.match)" />
+        <el-form-item label="URL" required>
+          <el-input v-model="sourceForm.match" placeholder="请输入文章 URL" @blur="sourceForm.domain = parseDomain(sourceForm.match)" />
         </el-form-item>
-        <el-row :gutter="12">
-          <el-col :span="12">
-            <el-form-item label="平台">
-              <el-input v-model="sourceForm.platform" placeholder="例如：官网、京东、知乎、小红书" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="域名">
-              <el-input v-model="sourceForm.domain" placeholder="系统会根据 URL 自动解析" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="12">
-          <el-col :span="12">
-            <el-form-item label="发布时间">
-              <el-date-picker v-model="sourceForm.publishTime" type="date" value-format="YYYY-MM-DD" placeholder="选择发布时间" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="信源类型">
-              <el-select v-model="sourceForm.type" style="width: 100%">
-                <el-option label="官网" value="官网" />
-                <el-option label="百科" value="百科" />
-                <el-option label="新闻稿" value="新闻稿" />
-                <el-option label="社媒账号" value="社媒账号" />
-                <el-option label="垂直媒体" value="垂直媒体" />
-                <el-option label="电商页" value="电商页" />
-                <el-option label="测评页" value="测评页" />
-                <el-option label="白皮书" value="白皮书" />
-                <el-option label="视频号" value="视频号" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="所属品牌">
-              <el-select v-model="sourceForm.category" style="width: 100%">
-                <el-option label="本品" value="本品" />
-                <el-option label="竞品" value="竞品" />
-                <el-option label="行业通用" value="行业通用" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="12">
-          <el-col :span="12">
-            <el-form-item label="当前状态">
-              <el-select v-model="sourceForm.status" style="width: 100%">
-                <el-option label="已收录" value="已收录" />
-                <el-option label="未收录" value="未收录" />
-                <el-option label="待优化" value="待优化" />
-                <el-option label="已失效" value="已失效" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="权威等级">
-              <el-radio-group v-model="sourceForm.weight">
-                <el-radio-button label="A级" />
-                <el-radio-button label="B级" />
-                <el-radio-button label="C级" />
-              </el-radio-group>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="12">
-          <el-col :span="12">
-            <el-form-item label="关联问题">
-              <el-select v-model="sourceForm.relatedQuestions" multiple filterable allow-create default-first-option placeholder="这篇文章被哪些问题的答案引用" style="width: 100%">
-                <el-option v-for="item in questionOptions" :key="item" :label="item" :value="item" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="关联模型">
-              <el-select v-model="sourceForm.relatedModels" multiple placeholder="这篇文章被哪些大模型引用" style="width: 100%">
-                <el-option v-for="model in modelOptions" :key="model" :label="model" :value="model" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <el-form-item label="发布时间" required>
+          <el-date-picker v-model="sourceForm.publishTime" type="date" value-format="YYYY-MM-DD" placeholder="选择发布时间" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="正文">
+          <el-input v-model="sourceForm.content" type="textarea" :rows="8" placeholder="请输入正文，可不填" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="sourceDialogVisible = false">取消</el-button>
@@ -399,10 +325,8 @@
           type="textarea"
           :rows="6"
           class="batch-input"
-          placeholder="也可以直接粘贴信源，每行一个。示例：
-卓牧羊奶粉品牌官网介绍, zhuomu.example.com, 官网, 官网, 本品, A级, 卓牧羊奶粉安全吗？;卓牧羊奶粉口碑怎么样？, 豆包;DeepSeek;Kimi, 未收录
-卓牧羊奶粉官方旗舰店商品页, https://mall.example.com/zhuomu, 官方旗舰店, 电商页, 本品, A级, 卓牧羊奶粉真实评价怎么样？, 豆包;元宝, 已收录
-知乎专栏：中老年羊奶粉怎么选, https://zhuanlan.zhihu.com/zhuomu, 知乎, 社媒账号, 本品, B级, 羊奶粉哪个牌子更适合长期喝？, 通义千问;文心一言, 待优化"
+          placeholder="支持批量添加，每行一个（标题;URL;发布时间）。示例：
+奶粉品牌推荐; https://mall.example.com; 2026-05-29"
         />
       </div>
       <template #footer>
@@ -460,6 +384,7 @@ const sourceForm = reactive({
   domain: '',
   platform: '',
   publishTime: '',
+  content: '',
   type: '官网',
   category: '本品',
   weight: 'A级',
@@ -842,6 +767,7 @@ const resetSourceForm = () => {
   sourceForm.domain = ''
   sourceForm.platform = ''
   sourceForm.publishTime = ''
+  sourceForm.content = ''
   sourceForm.type = '官网'
   sourceForm.category = '本品'
   sourceForm.weight = 'A级'
@@ -861,6 +787,7 @@ const openSourceDialog = (row) => {
     sourceForm.domain = row.domain || parseDomain(row.match)
     sourceForm.platform = row.platform
     sourceForm.publishTime = row.publishTime
+    sourceForm.content = row.content || ''
     sourceForm.type = row.type
     sourceForm.category = row.category
     sourceForm.weight = row.weight
@@ -873,8 +800,8 @@ const openSourceDialog = (row) => {
 }
 
 const confirmSource = () => {
-  if (!sourceForm.name.trim() || !sourceForm.match.trim()) {
-    ElMessage.warning('请填写文章标题和信源 URL / 域名')
+  if (!sourceForm.name.trim() || !sourceForm.match.trim() || !sourceForm.publishTime) {
+    ElMessage.warning('请填写文章标题、URL 和发布时间')
     return
   }
   const normalizedDomain = sourceForm.domain || parseDomain(sourceForm.match)

@@ -41,7 +41,7 @@
           <el-menu-item index="/projects/opinion-deepdive">
             <el-icon><DataAnalysis /></el-icon>
             <template #title>
-              <span>AI 全域舆情深钻系统</span>
+              <span>【先不做】AI 全域舆情深钻系统</span>
             </template>
           </el-menu-item>
         </el-sub-menu>

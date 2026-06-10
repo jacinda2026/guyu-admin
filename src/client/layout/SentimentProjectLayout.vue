@@ -38,7 +38,7 @@
             <div class="group-title"><el-icon><DataBoard /></el-icon> 舆情项目</div>
           </template>
           <el-menu-item :index="`/sentiment-project/${projectId}/overview`">舆情概览</el-menu-item>
-          <el-menu-item :index="`/sentiment-project/${projectId}/real-time`">实时舆情</el-menu-item>
+          <el-menu-item :index="`/sentiment-project/${projectId}/real-time`">实时舆情【先不做】</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/clues`">舆情线索</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/sources`">信源列表</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/question-list`">问题列表</el-menu-item>
@@ -52,10 +52,9 @@
             <div class="group-title"><el-icon><Setting /></el-icon> 配置中心</div>
           </template>
           <el-menu-item :index="`/sentiment-project/${projectId}/config/subject`">监控主体</el-menu-item>
-          <el-menu-item :index="`/sentiment-project/${projectId}/config/risk`">风险词库</el-menu-item>
-          <el-menu-item :index="`/sentiment-project/${projectId}/config/issue`">舆情问题配置</el-menu-item>
+          <el-menu-item :index="`/sentiment-project/${projectId}/config/issue`">提问配置</el-menu-item>
           <el-menu-item :index="`/sentiment-project/${projectId}/config/monitor`">监控配置</el-menu-item>
-          <el-menu-item :index="`/sentiment-project/${projectId}/config/alert`">预警配置</el-menu-item>
+          <el-menu-item :index="`/sentiment-project/${projectId}/config/alert`">预警配置【先不做】</el-menu-item>
         </el-menu-item-group>
       </el-menu>
     </el-aside>
@@ -139,8 +138,7 @@ const pageTitleMap = {
 
 const configPageTitleMap = {
   subject: '监控主体',
-  risk: '风险词库',
-  issue: '舆情问题配置',
+  issue: '提问配置',
   monitor: '监控配置',
   alert: '预警配置'
 }

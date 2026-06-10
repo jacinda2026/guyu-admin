@@ -5,70 +5,73 @@
       <p class="page-subtitle">通过舆情问题采集 AI 回答、风险信源和负面表达，持续追踪品牌、产品、事件或门店的 AI 舆情健康度。</p>
     </div>
 
-    <el-row :gutter="16" class="overview-row mb-20">
-      <el-col :span="6" v-for="item in overviewStats" :key="item.label">
-        <el-card shadow="never" class="overview-card">
-          <div class="overview-label">{{ item.label }}</div>
-          <div class="overview-value" :class="item.type">{{ item.value }}</div>
-          <div class="overview-desc">{{ item.desc }}</div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <el-card shadow="never" class="table-card mb-20">
+      <el-form :inline="true" class="search-form">
+        <el-form-item label="项目名称：">
+          <el-input v-model="searchForm.projectName" placeholder="请输入项目名称" clearable style="width: 220px;" />
+        </el-form-item>
+        <el-form-item label="用户信息：">
+          <el-input v-model="searchForm.userInfo" placeholder="请输入用户信息" clearable style="width: 200px;" />
+        </el-form-item>
+        <el-form-item class="search-actions">
+          <el-button type="primary" @click="handleSearch">查询</el-button>
+          <el-button @click="resetSearch">重置</el-button>
+        </el-form-item>
+        <el-form-item class="search-create-action">
+          <el-button type="primary" class="create-project-btn" @click="handleCreateTask">+ 创建项目</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
 
     <el-card shadow="never" class="table-card">
-      <div class="filter-bar mb-20">
-        <el-input v-model="searchQuery" placeholder="输入主体、项目或工单号检索..." style="width: 320px;" clearable>
-          <template #prefix><el-icon><Search /></el-icon></template>
-        </el-input>
-        <el-button type="primary" class="create-project-btn" @click="handleCreateTask">
-          <el-icon><Plus /></el-icon> 创建项目
-        </el-button>
-      </div>
-
-      <el-table :data="filteredTasks" style="width: 100%" stripe>
-        <el-table-column prop="id" label="项目编号" width="130" />
-        <el-table-column label="舆情监控项目" min-width="240">
+      <el-table :data="pagedTasks" style="width: 100%" :header-cell-style="{'text-align': 'center', 'background-color': '#f9fafc', 'color': '#333'}">
+        <el-table-column prop="id" label="项目编号" align="center" width="130" />
+        <el-table-column label="项目名称" align="center" min-width="240">
           <template #default="{ row }">
             <el-link type="primary" :underline="false" class="project-link" @click="enterSentimentProject(row)">
               {{ row.targetName }}
             </el-link>
-            <div class="row-sub">{{ row.entityType }} · {{ row.projectType }}</div>
           </template>
         </el-table-column>
-        <el-table-column prop="questionCount" label="舆情问题数" width="110" align="center" />
-        <el-table-column label="模型覆盖" width="150" align="center">
+        <el-table-column prop="userInfo" label="用户信息" align="center" width="100" />
+        <el-table-column prop="questionCount" label="问题数" align="center" width="80" />
+        <el-table-column label="监控模型" width="120" align="center">
           <template #default="{ row }">
             <span class="model-count">{{ row.models }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="cycle" label="监控周期" min-width="180" />
-        <el-table-column prop="createTime" label="项目创建时间" width="150" />
+        <el-table-column prop="cycle" label="监控周期" align="center" min-width="140" />
         
-        <el-table-column label="风险评级" width="120" align="center">
+        <el-table-column label="监控状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="getRiskTagType(row.riskLevel)" effect="dark" size="small">
-              {{ row.riskLevel }}
-            </el-tag>
+            <span :class="['status-text', getStatusClass(row.status)]">{{ row.status }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="riskSourceCount" label="风险信源" width="100" align="center" />
+        <el-table-column prop="updateTime" label="数据更新" align="center" width="160" />
+        <el-table-column prop="createTime" label="创建时间" align="center" width="140" />
 
-        <el-table-column label="状态" width="100" align="center">
+        <el-table-column label="操作" width="260" align="center" fixed="right">
           <template #default="{ row }">
-            <el-tag :type="row.status === '已交付' ? 'success' : 'warning'" size="small" effect="plain">
-              {{ row.status }}
-            </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="操作" width="160" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button type="primary" size="small" plain @click="openSentimentReportStandalone(row)">
-              <el-icon><Monitor /></el-icon> 穿透在线报告
-            </el-button>
+            <div class="table-actions">
+              <el-button link type="primary" @click="stopSentimentProject(row)">停止</el-button>
+              <el-button link type="primary" @click="runSentimentProjectNow(row)">手动执行</el-button>
+              <el-button link type="primary" @click="openSentimentReportStandalone(row)">报告</el-button>
+              <el-button link type="danger" @click="deleteSentimentProject(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination-wrapper">
+        <span class="total-text">共 {{ filteredTasks.length }} 条记录 第 {{ currentPage }} / {{ totalPages }} 页</span>
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="prev, pager, next, sizes, jumper"
+          :total="filteredTasks.length"
+        />
+      </div>
     </el-card>
 
     <el-dialog
@@ -88,8 +91,8 @@
       <el-form :model="createForm" label-position="top" class="task-create-body">
         <section class="form-section project-name-section">
           <div class="basic-form-grid">
-            <div class="basic-form-row">
-              <div class="basic-form-label">项目名称</div>
+            <div class="basic-form-row vertical">
+              <div class="basic-form-label required">项目名称</div>
               <el-input
                 v-model="createForm.projectName"
                 maxlength="120"
@@ -107,33 +110,19 @@
               />
               <div class="field-tip">输入品牌名、公司名、产品名或事件名称</div>
             </div>
-            <div class="basic-form-row vertical">
-              <div class="basic-form-label required">主体类型</div>
-              <el-radio-group v-model="createForm.entityType" class="entity-type-grid">
-                <el-radio-button
-                v-for="item in entityTypeOptions"
-                :key="item.value"
-                  :label="item.value"
-                  class="entity-type-option"
-              >
-                <span class="entity-name">{{ item.label }}</span>
-                <span class="entity-example">{{ item.example }}</span>
-                </el-radio-button>
-              </el-radio-group>
-            </div>
           </div>
         </section>
 
         <section class="form-section">
           <div class="section-bar">
-            <div class="section-title title-with-count">问题管理 <span class="section-count">共{{ createQuestionCount }}个问题</span></div>
+            <div class="section-title title-with-count required-title">问题管理 <span class="section-count">共{{ createQuestionCount }}个问题</span></div>
             <div class="section-actions question-actions">
               <el-button type="primary" plain @click="openIssueExpandTool">AI拓词</el-button>
             </div>
           </div>
           <el-row :gutter="16">
-            <el-col :span="12">
-              <el-form-item label="监控问题" required>
+            <el-col :span="24">
+              <el-form-item required>
                 <el-input
                   v-model="createForm.questions"
                   type="textarea"
@@ -142,20 +131,6 @@
 奥迪E7X换壳争议是否属实？
 这次质量投诉会不会影响购买？
 用户对该品牌售后有哪些负面反馈？"
-                />
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="核心监测关键词" required>
-                <el-input
-                  v-model="createForm.keywords"
-                  type="textarea"
-                  :rows="5"
-                  placeholder="每行一个关键词，例如：
-换壳争议
-质量投诉
-虚假宣传
-售后维权"
                 />
               </el-form-item>
             </el-col>
@@ -286,12 +261,18 @@
 <script setup>
 import { reactive, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { Search, Plus, Monitor } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 
 const router = useRouter()
-const searchQuery = ref('')
 const createDialogVisible = ref(false)
+const issueExpandCount = ref(0)
+const currentPage = ref(1)
+const pageSize = ref(10)
+const searchForm = reactive({
+  projectName: '',
+  userInfo: ''
+})
 
 const getDefaultCreateModels = () => [
   { key: 'doubao', name: '豆包', short: '豆', logoClass: 'logo-rainbow', enabled: true, deepThinking: false, allScreenshot: false, mentionScreenshot: false },
@@ -302,20 +283,11 @@ const getDefaultCreateModels = () => [
   { key: 'kimi', name: 'Kimi', short: 'K', logoClass: 'logo-dark', enabled: true, deepThinking: false, allScreenshot: false, mentionScreenshot: false }
 ]
 
-const entityTypeOptions = [
-  { label: '品牌/产品', value: '品牌/产品', example: '卓牧羊奶粉、奥迪E7X' },
-  { label: '门店/地点', value: '门店/地点', example: '汉庭某门店、某医院' },
-  { label: '事件专项', value: '事件专项', example: '换壳争议、质量投诉' },
-  { label: '人物/机构', value: '人物/机构', example: '某CEO、某MCN机构' },
-  { label: '竞品/行业', value: '竞品/行业', example: '羊奶粉行业、新能源SUV' }
-]
-
 const createForm = reactive({
   projectName: '',
   targetName: '',
   entityType: '品牌/产品',
   questions: '',
-  keywords: '',
   collectChannel: 'standard',
   models: getDefaultCreateModels(),
   monitor: {
@@ -356,42 +328,53 @@ const createEstimatedDailyCost = computed(() => {
   return ((baseUnits + enhancedUnits) * MODEL_UNIT_PRICE).toFixed(2)
 })
 
-const overviewStats = computed(() => {
-  const total = sentimentTasksData.value.length
-  const highRisk = sentimentTasksData.value.filter(item => item.riskLevel === '极度高危').length
-  const running = sentimentTasksData.value.filter(item => item.status === '分析中').length
-  const questionTotal = sentimentTasksData.value.reduce((sum, item) => sum + Number(item.questionCount || 0), 0)
-  return [
-    { label: '舆情项目', value: total, desc: '覆盖品牌、事件、门店和行业', type: 'primary' },
-    { label: '高危项目', value: highRisk, desc: '需要优先复核与处置', type: 'danger' },
-    { label: '舆情问题', value: questionTotal, desc: '用于采集 AI 回答与信源', type: 'primary' },
-    { label: '分析中', value: running, desc: '异步采集与报告生成中', type: 'warning' }
-  ]
-})
-
 // 舆情工单归档池，数据完美对齐您的奥迪与 AuraLuxe 舆情资产
 const sentimentTasksData = ref([
-  { id: 'SEN-MOCK-AUDI', targetName: '奥迪E7X与智己LS7「换壳」舆情审计项目', entityType: '事件专项', projectType: '事件专项追踪', questionCount: 36, models: '6个', riskSourceCount: 18, cycle: '2026-04-10 至 2026-05-18', createTime: '2026-05-16 10:00', riskLevel: '极度高危', status: '已交付' },
-  { id: 'SEN-827311', targetName: 'AuraLuxe 高端空气净化家电口碑监控', entityType: '品牌/产品', projectType: '产品口碑监测', questionCount: 28, models: '5个', riskSourceCount: 7, cycle: '2026-04-01 至 2026-05-15', createTime: '2026-05-15 14:20', riskLevel: '中度风险', status: '已交付' },
-  { id: 'SEN-829104', targetName: '汉庭北京新国展祥云小镇店舆情监控', entityType: '门店/地点', projectType: '门店口碑监测', questionCount: 18, models: '4个', riskSourceCount: 1, cycle: '2026-05-01 至 2026-05-17', createTime: '2026-05-17 19:20', riskLevel: '暂无风险', status: '分析中' }
+  { id: 'SEN-MOCK-AUDI', targetName: '奥迪E7X与智己LS7「换壳」舆情审计项目', userInfo: '范范', monitorSubject: '奥迪E7X换壳争议', entityType: '事件专项', projectType: '事件专项追踪', questionCount: 36, models: '6个', riskSourceCount: 18, cycle: '每日/2次', updateTime: '2026.05.18 18:20:00', createTime: '2026.05.16', riskLevel: '极度高危', status: '运行中' },
+  { id: 'SEN-827311', targetName: 'AuraLuxe 高端空气净化家电口碑监控', userInfo: 'Lee', monitorSubject: 'AuraLuxe 空气净化器', entityType: '品牌/产品', projectType: '产品口碑监测', questionCount: 28, models: '5个', riskSourceCount: 7, cycle: '每日/1次', updateTime: '2026.05.15 14:20:00', createTime: '2026.05.15', riskLevel: '中度风险', status: '运行中' },
+  { id: 'SEN-829104', targetName: '汉庭北京新国展祥云小镇店舆情监控', userInfo: '午未', monitorSubject: '汉庭北京新国展祥云小镇店', entityType: '门店/地点', projectType: '门店口碑监测', questionCount: 18, models: '4个', riskSourceCount: 1, cycle: '每周/2次', updateTime: '2026.05.17 19:20:00', createTime: '2026.05.17', riskLevel: '暂无风险', status: '停止' }
 ])
 
 const filteredTasks = computed(() => {
-  if (!searchQuery.value) return sentimentTasksData.value
-  const q = searchQuery.value.toLowerCase()
+  const projectName = searchForm.projectName.trim().toLowerCase()
+  const userInfo = searchForm.userInfo.trim().toLowerCase()
   return sentimentTasksData.value.filter(t =>
-    t.targetName.toLowerCase().includes(q) ||
-    t.id.toLowerCase().includes(q) ||
-    t.entityType.toLowerCase().includes(q) ||
-    t.projectType.toLowerCase().includes(q)
+    (!projectName ||
+      t.targetName.toLowerCase().includes(projectName) ||
+      t.id.toLowerCase().includes(projectName) ||
+      t.entityType.toLowerCase().includes(projectName) ||
+      t.projectType.toLowerCase().includes(projectName) ||
+      String(t.monitorSubject || '').toLowerCase().includes(projectName)) &&
+    (!userInfo || String(t.userInfo || '').toLowerCase().includes(userInfo))
   )
 })
 
-const getRiskTagType = (level) => {
-  if (level === '极度高危') return 'danger'
-  if (level === '中度风险') return 'warning'
-  if (level === '待评估') return 'info'
-  return 'success'
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredTasks.value.length / pageSize.value)))
+
+const pagedTasks = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return filteredTasks.value.slice(start, start + pageSize.value)
+})
+
+const handleSearch = () => {
+  currentPage.value = 1
+}
+
+const resetSearch = () => {
+  searchForm.projectName = ''
+  searchForm.userInfo = ''
+  currentPage.value = 1
+}
+
+const getStatusClass = (status) => {
+  if (status === '运行中') return 'text-success'
+  if (status === '分析中') return 'text-warning'
+  return 'text-muted'
+}
+
+const formatNow = () => {
+  const now = new Date()
+  return `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
 }
 
 // 🌟 核心跳转：直接带参数在新标签页打开 public/ai_sentiment_insight_report.html
@@ -411,12 +394,62 @@ const enterSentimentProject = (row) => {
   router.push(`/sentiment-project/${row.id}/overview`)
 }
 
+const stopSentimentProject = async (row) => {
+  try {
+    await ElMessageBox.confirm(
+      '停止后，不会自动执行舆情监控任务，后续仍可以手动执行任务。',
+      '停止舆情项目',
+      {
+        confirmButtonText: '确认停止',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+  } catch (error) {
+    return
+  }
+  row.status = '停止'
+  ElMessage.success(`已停止项目：${row.targetName}`)
+}
+
+const runSentimentProjectNow = async (row) => {
+  try {
+    await ElMessageBox.confirm(`确认立即手动执行项目「${row.targetName}」？`, '手动执行确认', {
+      confirmButtonText: '确认执行',
+      cancelButtonText: '取消',
+      type: 'info'
+    })
+  } catch (error) {
+    return
+  }
+  row.status = '分析中'
+  row.updateTime = formatNow()
+  ElMessage.success(`已手动执行项目：${row.targetName}`)
+}
+
+const deleteSentimentProject = async (row) => {
+  try {
+    await ElMessageBox.confirm(`删除后将移除项目「${row.targetName}」，相关监控任务也将不再展示。是否确认删除？`, '删除舆情项目', {
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+      confirmButtonClass: 'el-button--danger'
+    })
+  } catch (error) {
+    return
+  }
+  const index = sentimentTasksData.value.findIndex(item => item.id === row.id)
+  if (index > -1) sentimentTasksData.value.splice(index, 1)
+  if (currentPage.value > totalPages.value) currentPage.value = totalPages.value
+  ElMessage.success('项目已删除')
+}
+
 const resetCreateForm = () => {
   createForm.projectName = ''
   createForm.targetName = ''
   createForm.entityType = '品牌/产品'
   createForm.questions = ''
-  createForm.keywords = ''
+  issueExpandCount.value = 0
   createForm.collectChannel = 'standard'
   createForm.models = getDefaultCreateModels()
   createForm.monitor.enabled = true
@@ -442,7 +475,58 @@ const syncCreateSplitTimes = () => {
 }
 
 const openIssueExpandTool = () => {
-  window.open('https://6zyknbc5d7.coze.site/', '_blank', 'noopener,noreferrer')
+  const subject = createForm.targetName.trim() || '谷雨智能优先公司'
+  if (!createForm.targetName.trim()) {
+    createForm.targetName = subject
+  }
+  const questionBatches = [
+    [
+      `${subject}近期是否出现负面舆情或用户集中投诉？`,
+      `${subject}在AI回答中是否被提及为高风险或不可信主体？`,
+      `${subject}相关产品或服务的口碑评价主要集中在哪些问题？`,
+      `${subject}是否存在虚假宣传、夸大承诺或误导用户的讨论？`,
+      `${subject}客户服务、交付体验或售后响应是否存在负面反馈？`,
+      `${subject}是否被竞品或行业讨论关联到争议事件？`,
+      `${subject}在新闻媒体、问答平台和社交平台中的风险信源有哪些？`,
+      `用户对${subject}的信任度、专业度和安全感评价如何？`,
+      `${subject}相关舆情是否会影响潜在客户的购买或合作决策？`,
+      `${subject}当前最需要优先澄清、回应或优化的舆情问题是什么？`
+    ],
+    [
+      `${subject}是否存在服务交付不及时、响应慢或结果不达预期的反馈？`,
+      `${subject}在社交平台上的讨论情绪是正向、中性还是负向？`,
+      `${subject}是否被用户质疑收费、合同、续费或退款政策？`,
+      `${subject}在行业对比中是否出现能力不足或口碑弱势的表达？`,
+      `${subject}相关负责人、团队或合作伙伴是否被卷入争议？`,
+      `${subject}是否存在被误解、被恶意解读或被断章取义的内容？`,
+      `${subject}在搜索结果中是否出现高排名负面内容或过期信息？`,
+      `${subject}是否有客户案例、资质能力或数据安全方面的质疑？`,
+      `${subject}负面舆情主要来自哪些平台、账号或内容类型？`,
+      `${subject}哪些正向信源可以用于回应和稀释负面舆情？`
+    ],
+    [
+      `${subject}是否出现品牌名称、业务模式或服务范围被AI错误理解的问题？`,
+      `${subject}用户是否关注其数据安全、隐私保护和合规能力？`,
+      `${subject}是否被关联到竞品对比、替代方案或行业排名争议？`,
+      `${subject}近期舆情变化是否由单一事件扩散为持续性认知风险？`,
+      `${subject}是否存在员工、客户或合作方爆料引发的声誉风险？`,
+      `${subject}在问答平台中的高频负面问题有哪些？`,
+      `${subject}是否出现“避坑”“不推荐”“投诉”等强风险表达？`,
+      `${subject}哪些关键词最容易触发负面联想或风险预警？`,
+      `${subject}当前舆情是否已经影响销售线索或合作转化？`,
+      `${subject}下一步应优先建设哪些权威内容和澄清信源？`
+    ]
+  ]
+  const nextQuestions = questionBatches[issueExpandCount.value % questionBatches.length]
+  const existingQuestions = createForm.questions.trim()
+  createForm.questions = existingQuestions
+    ? `${existingQuestions}\n${nextQuestions.join('\n')}`
+    : nextQuestions.join('\n')
+  issueExpandCount.value += 1
+  if (!createForm.projectName.trim()) {
+    createForm.projectName = `${subject}舆情监控项目`
+  }
+  ElMessage.success(`已新增 10 个舆情监控问题，共 ${createQuestionCount.value} 个`)
 }
 
 const setCollectChannel = (channel) => {
@@ -468,41 +552,35 @@ const submitSentimentTask = () => {
     ElMessage.warning('请填写核心舆情问题')
     return
   }
-  if (!createForm.keywords.trim()) {
-    ElMessage.warning('请填写核心监测关键词')
-    return
-  }
-
   const now = new Date()
   const questionCount = createForm.questions.split('\n').map(item => item.trim()).filter(Boolean).length
-  const intelligentType = inferSentimentProjectType(createForm.entityType, createForm.targetName, createForm.questions)
+  const intelligentType = inferSentimentProjectType(createForm.targetName, createForm.questions)
   const enabledModelCount = createForm.models.filter(item => item.enabled).length
   const task = {
     id: `SEN-${String(now.getTime()).slice(-6)}`,
     targetName: createForm.projectName.trim(),
+    userInfo: '当前用户',
     monitorSubject: createForm.targetName.trim(),
     entityType: intelligentType.entityType,
     projectType: intelligentType.projectType,
     questionCount,
     models: `${enabledModelCount}个`,
     riskSourceCount: 0,
-    cycle: '持续监测',
-    createTime: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+    cycle: createForm.monitor.period === 'weekly' ? `每周/${createForm.monitor.dailyTimes}次` : createForm.monitor.period === 'interval' ? `间隔/${createForm.monitor.intervalDays}天` : `每日/${createForm.monitor.dailyTimes}次`,
+    updateTime: formatNow(),
+    createTime: `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`,
     riskLevel: '待评估',
-    status: '分析中'
+    status: '运行中'
   }
 
   sentimentTasksData.value.unshift(task)
+  currentPage.value = 1
   createDialogVisible.value = false
   ElMessage.success('已创建项目，系统正在进入异步采集与分析队列')
 }
 
-const inferSentimentProjectType = (entityType, topic, questions) => {
+const inferSentimentProjectType = (topic, questions) => {
   const text = `${topic} ${questions}`.toLowerCase()
-  if (entityType === '竞品/行业') return { entityType, projectType: '竞品舆情对比' }
-  if (entityType === '门店/地点') return { entityType, projectType: '门店口碑监测' }
-  if (entityType === '事件专项') return { entityType, projectType: '事件专项追踪' }
-  if (entityType === '人物/机构') return { entityType, projectType: '品牌声誉监测' }
   if (/竞品|对比|行业|赛道|品类/.test(text)) {
     return { entityType: '竞品/行业', projectType: '竞品舆情对比' }
   }
@@ -530,20 +608,25 @@ const inferSentimentProjectType = (entityType, topic, questions) => {
 .page-title { margin: 0 0 8px; font-size: 22px; color: #303133; font-weight: 600; }
 .page-subtitle { margin: 0; color: #909399; font-size: 14px; }
 .mb-20 { margin-bottom: 20px; }
-.overview-row { align-items: stretch; }
-.overview-card { border: none; border-radius: 8px; height: 100%; }
-.overview-label { color: #909399; font-size: 13px; margin-bottom: 10px; }
-.overview-value { color: #2b65f0; font-size: 28px; font-weight: 800; line-height: 1; }
-.overview-value.danger { color: #f56c6c; }
-.overview-value.warning { color: #e6a23c; }
-.overview-desc { margin-top: 10px; color: #64748b; font-size: 12px; }
 .table-card { border: none; border-radius: 8px; background: #fff; }
-.filter-bar { display: flex; justify-content: space-between; align-items: center; }
+.search-form { display: flex; align-items: center; padding-top: 18px; width: 100%; flex-wrap: wrap; }
+.search-form :deep(.el-form-item) { margin-bottom: 18px; margin-right: 24px; }
+.search-form :deep(.el-form-item__label) { font-weight: 500; color: #333; }
+.search-create-action { margin-left: auto !important; margin-right: 0 !important; }
+.search-actions { margin-right: 12px !important; }
 .create-project-btn { min-width: 104px; }
 .cursor-pointer { cursor: pointer; }
 .project-link { font-weight: 700; font-size: 14px; }
-.row-sub { margin-top: 4px; color: #909399; font-size: 12px; }
 .model-count { color: #303133; font-weight: 700; }
+.status-text { font-size: 13px; font-weight: 500; }
+.text-success { color: #0f9f59; font-weight: 700; }
+.text-warning { color: #e6a23c; font-weight: 700; }
+.text-muted { color: #909399; }
+.table-actions { display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
+.table-actions :deep(.el-button) { margin-left: 0; padding: 0; }
+.pagination-wrapper { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; padding-top: 16px; }
+.total-text { font-size: 13px; color: #909399; }
+:deep(.el-pagination.is-background .el-pager li:not(.is-disabled).is-active) { background-color: #2b65f0; }
 .dialog-header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .dialog-title { color: #111827; font-size: 18px; font-weight: 800; }
 .dialog-tip { color: #94a3b8; font-size: 12px; }
@@ -590,6 +673,7 @@ const inferSentimentProjectType = (entityType, topic, questions) => {
 .section-index { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #f56c6c; color: #fff; font-size: 12px; font-weight: 800; }
 .section-head > div { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .section-title { color: #111827; font-size: 15px; font-weight: 800; line-height: 1.1; }
+.required-title::before { content: '* '; color: #ef4444; font-weight: 800; }
 .section-desc { color: #94a3b8; font-size: 12px; }
 .task-create-body :deep(.el-form-item) { margin-bottom: 16px; }
 .form-section :deep(.el-form-item__label) { color: #1f2937; font-size: 13px; font-weight: 700; line-height: 1.2; margin-bottom: 8px; }

@@ -128,7 +128,7 @@ const routes = [
     children: [
       { path: 'config', redirect: to => `/sentiment-project/${to.params.id}/config/subject` },
       { path: 'config/subject', name: 'SentimentProjectConfigSubject', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '鐩戞帶涓讳綋', configPage: 'subject' } },
-      { path: 'config/risk', name: 'SentimentProjectConfigRisk', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '椋庨櫓璇嶅簱', configPage: 'risk' } },
+      { path: 'config/risk', redirect: to => `/sentiment-project/${to.params.id}/config/issue` },
       { path: 'config/issue', name: 'SentimentProjectConfigIssue', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '鑸嗘儏闂閰嶇疆', configPage: 'issue' } },
       { path: 'config/monitor', name: 'SentimentProjectConfigMonitor', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '鐩戞帶閰嶇疆', configPage: 'monitor' } },
       { path: 'config/alert', name: 'SentimentProjectConfigAlert', component: () => import('../views/sentiment/SentimentProjectWorkspace.vue'), meta: { title: '棰勮閰嶇疆', configPage: 'alert' } },
