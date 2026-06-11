@@ -1,4 +1,4 @@
-<!-- VERSION: SourceManagement_v20260605_1546 -->
+<!-- VERSION: SourceManagement_v20260611_0538 -->
 <template>
   <div class="source-management-page">
     <section v-if="isRelatedQuestionPage" class="page-card">
@@ -75,7 +75,7 @@
             <el-select v-model="modelFilter" class="model-filter" placeholder="所有模型" multiple collapse-tags collapse-tags-tooltip clearable>
               <el-option v-for="model in modelOptions" :key="model" :label="model" :value="model" />
             </el-select>
-            <el-input v-model="keyword" class="search-input" placeholder="搜索文章标题、URL、关联问题或关联模型" :prefix-icon="Search" clearable />
+            <el-input v-model="keyword" class="search-input" placeholder="搜索文章标题、作者、URL、关联问题或关联模型" :prefix-icon="Search" clearable />
             <el-select v-model="statusFilter" class="status-filter" placeholder="当前状态" clearable>
               <el-option label="已收录" value="已收录" />
               <el-option label="未收录" value="未收录" />
@@ -98,6 +98,9 @@
               </template>
             </el-table-column>
             <el-table-column prop="platform" label="平台" width="110" />
+            <el-table-column label="作者" width="120" show-overflow-tooltip>
+              <template #default="{ row }">{{ row.author || '-' }}</template>
+            </el-table-column>
             <el-table-column prop="domain" label="域名" min-width="170" show-overflow-tooltip />
             <el-table-column prop="type" label="信源类型" width="110" />
             <el-table-column label="关联问题数" width="104" align="center">
@@ -143,8 +146,9 @@
               </template>
             </el-table-column>
             <el-table-column prop="publishTime" label="发布时间" width="120" />
-            <el-table-column label="操作" width="86" fixed="right">
+            <el-table-column label="操作" width="130" fixed="right">
               <template #default="{ row }">
+                <el-button link type="primary" @click="openSourceDialog(row)">编辑</el-button>
                 <el-button link type="primary" @click="removeSource(row)">删除</el-button>
               </template>
             </el-table-column>
@@ -291,13 +295,16 @@
       </el-tabs>
     </section>
 
-    <el-dialog v-model="sourceDialogVisible" title="添加信源" width="720px">
+    <el-dialog v-model="sourceDialogVisible" :title="sourceDialogTitle" width="720px">
       <el-form label-position="top">
         <el-form-item label="文章标题" required>
           <el-input v-model="sourceForm.name" placeholder="请输入文章标题" />
         </el-form-item>
-        <el-form-item label="URL" required>
+        <el-form-item label="文章链接" required>
           <el-input v-model="sourceForm.match" placeholder="请输入文章 URL" @blur="sourceForm.domain = parseDomain(sourceForm.match)" />
+        </el-form-item>
+        <el-form-item label="作者">
+          <el-input v-model="sourceForm.author" placeholder="请输入作者，可不填" />
         </el-form-item>
         <el-form-item label="发布时间" required>
           <el-date-picker v-model="sourceForm.publishTime" type="date" value-format="YYYY-MM-DD" placeholder="选择发布时间" style="width: 100%" />
@@ -308,7 +315,7 @@
       </el-form>
       <template #footer>
         <el-button @click="sourceDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmSource">保存</el-button>
+        <el-button type="primary" @click="confirmSource">{{ sourceDialogSubmitText }}</el-button>
       </template>
     </el-dialog>
 
@@ -317,15 +324,15 @@
         <el-upload drag action="#" :auto-upload="false" accept=".xlsx,.xls,.csv">
           <el-icon class="upload-icon"><UploadFilled /></el-icon>
           <div class="upload-title">将 Excel / CSV 文件拖到此处，或点击上传</div>
-          <div class="upload-desc">字段建议：文章标题、URL/域名、平台、信源类型、所属品牌、关联问题、关联模型、当前状态</div>
+          <div class="upload-desc">字段建议：文章标题、URL/域名、发布时间、作者</div>
         </el-upload>
         <el-input
           v-model="batchText"
           type="textarea"
           :rows="6"
           class="batch-input"
-          placeholder="支持批量添加，每行一个（标题;URL;发布时间）。示例：
-奶粉品牌推荐; https://mall.example.com; 2026-05-29"
+          placeholder="支持批量添加，每行一个（标题,文章链接,发布时间,作者）。示例：
+奶粉品牌推荐,https://mall.example.com,2026-05-24,张三"
         />
       </div>
       <template #footer>
@@ -382,6 +389,7 @@ const sourceForm = reactive({
   match: '',
   domain: '',
   platform: '',
+  author: '',
   publishTime: '',
   content: '',
   type: '官网',
@@ -390,6 +398,9 @@ const sourceForm = reactive({
   relatedModels: [],
   status: '未收录'
 })
+
+const sourceDialogTitle = computed(() => editingSourceId.value ? '编辑信源' : '添加信源')
+const sourceDialogSubmitText = computed(() => editingSourceId.value ? '保存修改' : '保存')
 
 const sourceList = ref([
   { id: 1, name: '卓牧羊奶粉品牌官网介绍', platform: '官网', type: '官网', category: '本品', match: 'zhuomu.example.com', domain: 'zhuomu.example.com', publishTime: '2026-05-20', weight: 'A级', status: '未收录', count: 3, count7d: 0, count30d: 3, relatedQuestions: ['卓牧羊奶粉安全吗？', '卓牧羊奶粉口碑怎么样？'], relatedModels: ['DeepSeek', 'Kimi'] },
@@ -600,7 +611,7 @@ const rangeCollectedSources = computed(() => collectedSourceList.value
 const filteredSources = computed(() => {
   const key = keyword.value.trim().toLowerCase()
   return rangeSources.value.filter(item => {
-    const matchKeyword = !key || `${item.name}${item.platform}${item.type}${item.category}${item.match}${item.domain}${(item.relatedQuestions || []).join('')}${(item.relatedModels || []).join('')}${item.status}`.toLowerCase().includes(key)
+    const matchKeyword = !key || `${item.name}${item.platform}${item.author || ''}${item.type}${item.category}${item.match}${item.domain}${(item.relatedQuestions || []).join('')}${(item.relatedModels || []).join('')}${item.status}`.toLowerCase().includes(key)
     const matchStatus = !statusFilter.value || item.status === statusFilter.value
     const matchModel = !modelFilter.value.length || modelFilter.value.some(model => (item.relatedModels || []).includes(model))
     return matchKeyword && matchStatus && matchModel
@@ -758,6 +769,7 @@ const resetSourceForm = () => {
   sourceForm.match = ''
   sourceForm.domain = ''
   sourceForm.platform = ''
+  sourceForm.author = ''
   sourceForm.publishTime = ''
   sourceForm.content = ''
   sourceForm.type = '官网'
@@ -777,6 +789,7 @@ const openSourceDialog = (row) => {
     sourceForm.match = row.match
     sourceForm.domain = row.domain || parseDomain(row.match)
     sourceForm.platform = row.platform
+    sourceForm.author = row.author || ''
     sourceForm.publishTime = row.publishTime
     sourceForm.content = row.content || ''
     sourceForm.type = row.type
@@ -824,8 +837,9 @@ const confirmSource = () => {
       count: 0
     })
   }
+  const isEditing = Boolean(editingSourceId.value)
   sourceDialogVisible.value = false
-  ElMessage.success('信源已保存')
+  ElMessage.success(isEditing ? '信源修改已保存' : '信源已添加')
 }
 
 const removeSource = async (row) => {
@@ -848,16 +862,25 @@ const confirmImport = () => {
   let addedCount = 0
   let duplicateCount = 0
   rows.forEach((line) => {
+    const parts = line.split(',').map(item => item?.trim())
     const [
       name,
       match,
       platform = '',
-      type = '官网',
-      category = '本品',
-      questions = '',
-      models = '',
-      status = '未收录'
-    ] = line.split(',').map(item => item?.trim())
+      fourth = '',
+      fifth = '本品',
+      sixth = '',
+      seventh = '',
+      eighth = '未收录',
+      ninth = '未收录'
+    ] = parts
+    const hasAuthorColumn = parts.length >= 9
+    const author = hasAuthorColumn ? fourth : ''
+    const type = hasAuthorColumn ? (fifth || '官网') : (fourth || '官网')
+    const category = hasAuthorColumn ? (sixth || '本品') : (fifth || '本品')
+    const questions = hasAuthorColumn ? seventh : sixth
+    const models = hasAuthorColumn ? eighth : seventh
+    const status = hasAuthorColumn ? ninth : eighth
     if (!name || !match) return
     const domain = parseDomain(match)
     const exists = sourceList.value.some(item => item.name === name || item.domain === domain)
@@ -869,6 +892,7 @@ const confirmImport = () => {
       id: Date.now() + Math.random(),
       name,
       platform,
+      author,
       type,
       category,
       match,
@@ -886,7 +910,7 @@ const confirmImport = () => {
 }
 
 const downloadTemplate = () => {
-  ElMessage.success('模板字段：文章标题、URL/域名、平台、信源类型、所属品牌、关联问题、关联模型、当前状态')
+  ElMessage.success('模板字段：文章标题、URL/域名、平台、作者、信源类型、所属品牌、关联问题、关联模型、当前状态')
 }
 
 const dedupeSources = () => {
