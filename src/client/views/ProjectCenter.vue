@@ -58,13 +58,33 @@
           </template>
         </el-table-column>
 
+        <el-table-column label="执行进度" align="center" min-width="260">
+          <template #default="{ row }">
+            <div v-if="row.executionProgress?.running" class="run-progress-cell">
+              <div class="run-model-progress-list">
+                <span
+                  v-for="model in row.executionProgress.models"
+                  :key="model.name"
+                  class="run-model-progress"
+                >
+                  {{ model.name }} {{ model.completedQuestions }}/{{ model.totalQuestions }}
+                </span>
+              </div>
+            </div>
+            <span v-else class="run-progress-idle">-</span>
+          </template>
+        </el-table-column>
+
         <el-table-column prop="updateTime" label="数据更新" align="center" width="160" />
         <el-table-column prop="createTime" label="创建时间" align="center" width="120" />
         <el-table-column label="操作" align="center" width="210" fixed="right">
           <template #default="{ row }">
             <div class="table-actions">
-              <el-button link type="primary" @click="stopProject(row)">停止</el-button>
-              <el-button link type="primary" @click="runProjectNow(row)">手动执行</el-button>
+              <el-button v-if="row.status === '停止'" link type="primary" @click="openStartProject(row)">启动</el-button>
+              <el-button v-else link type="primary" @click="stopProject(row)">停止</el-button>
+              <el-button link type="primary" :disabled="row.executionProgress?.running" @click="runProjectNow(row)">
+                {{ row.executionProgress?.running ? '执行中' : '手动执行' }}
+              </el-button>
               <el-button link type="danger" @click="deleteProject(row)">删除</el-button>
             </div>
           </template>
@@ -212,6 +232,24 @@
                 <div class="section-title tooltip-title">监控配置</div>
               </el-tooltip>
               <el-switch v-model="createForm.monitor.enabled" active-text="开" inactive-text="关" inline-prompt />
+              <div class="inline-form-item deadline-inline">
+                <el-tooltip content="到期后自动关闭监控" placement="top">
+                  <span class="inline-label tooltip-title">监控截止日期</span>
+                </el-tooltip>
+              <el-segmented v-model="createForm.monitor.endDateMode" :options="deadlineModeOptions" />
+              <el-date-picker
+                v-if="createForm.monitor.endDateMode === 'date'"
+                v-model="createForm.monitor.endDate"
+                type="date"
+                format="YYYY/MM/DD"
+                value-format="YYYY/MM/DD"
+                placeholder="选择日期"
+                :disabled-date="disablePastDate"
+                :editable="false"
+                @change="normalizeMonitorEndDate(createForm.monitor)"
+                class="date-picker"
+              />
+              </div>
             </div>
           </div>
           <div class="monitor-form-row monitor-row-main">
@@ -336,8 +374,37 @@
             <span class="billing-cost-amount">¥{{ estimatedDailyCost }}</span>
           </div>
           <el-button @click="createDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="saveCreateProject">保存</el-button>
+          <el-button class="save-only-btn" @click="saveCreateProject(false)">保存</el-button>
+          <el-button type="primary" @click="saveCreateProject(true)">保存并立刻执行一次</el-button>
         </div>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="startDialogVisible" title="启动监控" width="520px" append-to-body>
+      <div class="start-project-dialog">
+        <div class="start-project-name">{{ startTargetProject?.projectName }}</div>
+        <div class="inline-form-item deadline-inline">
+          <el-tooltip content="到期后自动关闭监控" placement="top">
+            <span class="inline-label tooltip-title">监控截止日期</span>
+          </el-tooltip>
+          <el-segmented v-model="startForm.endDateMode" :options="deadlineModeOptions" />
+          <el-date-picker
+            v-if="startForm.endDateMode === 'date'"
+            v-model="startForm.endDate"
+            type="date"
+            format="YYYY/MM/DD"
+            value-format="YYYY/MM/DD"
+            placeholder="选择日期"
+            :disabled-date="disablePastDate"
+            :editable="false"
+            @change="normalizeMonitorEndDate(startForm)"
+            class="date-picker"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="startDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmStartProject">确认启动</el-button>
       </template>
     </el-dialog>
 
@@ -435,6 +502,12 @@ const searchForm = reactive({
 const currentPage = ref(1)
 const pageSize = ref(10)
 const createDialogVisible = ref(false)
+const startDialogVisible = ref(false)
+const startTargetProject = ref(null)
+const startForm = reactive({
+  endDateMode: 'permanent',
+  endDate: '2026/07/11'
+})
 const ownBrandDialogVisible = ref(false)
 const ownBrandForm = reactive({ name: '', aliasesText: '' })
 const competitorEditDialogVisible = ref(false)
@@ -460,27 +533,27 @@ const tableData = ref([
   {
     id: 'proj-jinan', projectName: '卓牧羊奶粉项目', userInfo: '李桂英', questionCount: 40,
     models: [MODEL_DICT.doubao, MODEL_DICT.yuanbao, MODEL_DICT.deepseek, MODEL_DICT.qwen, MODEL_DICT.wenxin, MODEL_DICT.kimi],
-    cycle: '每日/2次', status: '运行中', updateTime: '2026.05.20 12:22:10', createTime: '2026.05.11'
+    cycle: '每日/2次', monitorEndDate: '永久', autoCloseOnExpire: false, status: '运行中', updateTime: '2026.05.20 12:22:10', createTime: '2026.05.11'
   },
   {
     id: 'proj-shuangyanpi', projectName: '初敏护肤品项目', userInfo: '张鹏', questionCount: 30,
     models: [MODEL_DICT.doubao, MODEL_DICT.yuanbao, MODEL_DICT.deepseek, MODEL_DICT.qwen, MODEL_DICT.wenxin, MODEL_DICT.kimi],
-    cycle: '每日/2次', status: '运行中', updateTime: '2026.05.20 12:22:10', createTime: '2026.05.11'
+    cycle: '每日/2次', monitorEndDate: '永久', autoCloseOnExpire: false, status: '运行中', updateTime: '2026.05.20 12:22:10', createTime: '2026.05.11'
   },
   {
     id: 'proj-meirongzhen', projectName: '美容针', userInfo: '郭丽', questionCount: 20,
     models: [MODEL_DICT.doubao, MODEL_DICT.yuanbao, MODEL_DICT.deepseek, MODEL_DICT.qwen, MODEL_DICT.wenxin, MODEL_DICT.kimi],
-    cycle: '每日/2次', status: '停止', updateTime: '2026.05.20 12:22:10', createTime: '2026.05.11'
+    cycle: '每日/2次', monitorEndDate: '永久', autoCloseOnExpire: false, status: '停止', updateTime: '2026.05.20 12:22:10', createTime: '2026.05.11'
   },
   {
     id: 'proj-remaji', projectName: '热玛吉', userInfo: '郭丽', questionCount: 11,
     models: [MODEL_DICT.doubao, MODEL_DICT.yuanbao, MODEL_DICT.deepseek, MODEL_DICT.qwen, MODEL_DICT.wenxin, MODEL_DICT.kimi],
-    cycle: '每周/2次', status: '停止', updateTime: '2026.05.20 12:22:10', createTime: '2026.05.11'
+    cycle: '每周/2次', monitorEndDate: '2026/07/31', autoCloseOnExpire: true, status: '停止', updateTime: '2026.05.20 12:22:10', createTime: '2026.05.11'
   },
   {
     id: 'proj-neimeng', projectName: '内蒙古美白项目', userInfo: '郭丽', questionCount: 23,
     models: [MODEL_DICT.doubao, MODEL_DICT.yuanbao, MODEL_DICT.deepseek, MODEL_DICT.qwen, MODEL_DICT.wenxin, MODEL_DICT.kimi],
-    cycle: '手动', status: '停止', updateTime: '2026.05.20 12:22:10', createTime: '2026.05.11'
+    cycle: '手动', monitorEndDate: '永久', autoCloseOnExpire: false, status: '停止', updateTime: '2026.05.20 12:22:10', createTime: '2026.05.11'
   }
 ])
 
@@ -499,6 +572,35 @@ const executeModeOptions = [
   { label: '分时执行', value: 'split' }
 ]
 
+const deadlineModeOptions = [
+  { label: '日期', value: 'date' },
+  { label: '永久', value: 'permanent' }
+]
+
+const getStartOfDayTime = (value) => {
+  const date = value instanceof Date ? value : new Date(typeof value?.valueOf === 'function' ? value.valueOf() : value)
+  date.setHours(0, 0, 0, 0)
+  return date.getTime()
+}
+
+const disablePastDate = (date) => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return getStartOfDayTime(date) < today.getTime()
+}
+
+const isPastDateValue = (value) => {
+  if (!value) return false
+  return disablePastDate(String(value).replaceAll('/', '-'))
+}
+
+const normalizeMonitorEndDate = (monitor) => {
+  if (monitor.endDateMode === 'date' && isPastDateValue(monitor.endDate)) {
+    monitor.endDate = ''
+    ElMessage.warning('监控截止日期不能早于当天')
+  }
+}
+
 const createDefaultForm = () => ({
   projectName: '',
   productName: '',
@@ -510,6 +612,8 @@ const createDefaultForm = () => ({
     period: 'daily',
     weekdays: ['mon'],
     startDate: '2026/05/12',
+    endDateMode: 'permanent',
+    endDate: '2026/07/11',
     intervalDays: 2,
     dailyTimes: 1,
     executeMode: 'split',
@@ -595,6 +699,54 @@ const estimateManualRunCost = (row) => {
   return (questionCount * modelCount * 0.1).toFixed(2)
 }
 
+const getPlatformCount = (row) => Array.isArray(row.models) ? row.models.length : 0
+
+const startRunProgress = (row) => {
+  const totalQuestions = Math.max(1, Number(row.questionCount) || 1)
+  const models = Array.isArray(row.models) && row.models.length ? row.models : []
+  const platformCount = models.length
+  if (row.executionProgress?.timerId) {
+    window.clearInterval(row.executionProgress.timerId)
+  }
+  row.executionProgress = {
+    running: true,
+    completedQuestions: 0,
+    totalQuestions,
+    completedWorkload: 0,
+    totalWorkload: totalQuestions * Math.max(1, platformCount),
+    platformCount,
+    models: models.map(model => ({
+      name: model.name,
+      completedQuestions: 0,
+      totalQuestions
+    })),
+    startedAt: new Date().toISOString(),
+    timerId: null
+  }
+  const step = Math.max(1, Math.ceil(totalQuestions / 12))
+  row.executionProgress.timerId = window.setInterval(() => {
+    row.executionProgress.models.forEach((model, index) => {
+      const modelStep = Math.max(1, step - (index % 2))
+      model.completedQuestions = Math.min(totalQuestions, model.completedQuestions + modelStep)
+    })
+    row.executionProgress.completedWorkload = row.executionProgress.models.reduce(
+      (total, model) => total + model.completedQuestions,
+      0
+    )
+    row.executionProgress.completedQuestions = Math.min(
+      totalQuestions,
+      Math.floor(row.executionProgress.completedWorkload / Math.max(1, platformCount))
+    )
+    if (row.executionProgress.completedWorkload >= row.executionProgress.totalWorkload) {
+      window.clearInterval(row.executionProgress.timerId)
+      row.executionProgress.running = false
+      row.executionProgress.finishedAt = new Date().toISOString()
+      row.updateTime = formatNow()
+      ElMessage.success(`项目「${row.projectName}」执行完成`)
+    }
+  }, 800)
+}
+
 const stopProject = async (row) => {
   try {
     await ElMessageBox.confirm(
@@ -613,7 +765,43 @@ const stopProject = async (row) => {
   ElMessage.success(`已停止项目「${row.projectName}」的自动监控，仍可手动执行`)
 }
 
+const openStartProject = (row) => {
+  startTargetProject.value = row
+  if (row.monitorEndDate && row.monitorEndDate !== '永久') {
+    startForm.endDateMode = 'date'
+    startForm.endDate = row.monitorEndDate
+  } else {
+    startForm.endDateMode = 'permanent'
+    startForm.endDate = '2026/07/11'
+  }
+  startDialogVisible.value = true
+}
+
+const confirmStartProject = () => {
+  const target = startTargetProject.value
+  if (!target) return
+  if (startForm.endDateMode === 'date' && !startForm.endDate) {
+    ElMessage.warning('请选择监控截止日期，或指定为永久')
+    return
+  }
+  if (startForm.endDateMode === 'date' && isPastDateValue(startForm.endDate)) {
+    ElMessage.warning('监控截止日期不能早于当天')
+    return
+  }
+  target.status = '运行中'
+  target.monitorEndDate = startForm.endDateMode === 'permanent' ? '永久' : startForm.endDate
+  target.autoCloseOnExpire = startForm.endDateMode === 'date'
+  target.updateTime = formatNow()
+  startDialogVisible.value = false
+  startTargetProject.value = null
+  ElMessage.success(`已启动项目「${target.projectName}」的自动监控`)
+}
+
 const runProjectNow = async (row) => {
+  if (row.executionProgress?.running) {
+    ElMessage.warning(`项目「${row.projectName}」正在执行中`)
+    return
+  }
   const now = new Date()
   const lastRunAt = row.lastManualRunAt ? new Date(row.lastManualRunAt) : null
   const minutesSinceLastRun = lastRunAt ? Math.floor((now.getTime() - lastRunAt.getTime()) / 60000) : null
@@ -640,8 +828,8 @@ const runProjectNow = async (row) => {
   }
 
   row.lastManualRunAt = now.toISOString()
-  row.updateTime = formatNow()
-  ElMessage.success(`已手动执行项目：${row.projectName}`)
+  startRunProgress(row)
+  ElMessage.success(`已开始手动执行项目：${row.projectName}`)
 }
 
 const setBillingConfirmTip = (content) => {
@@ -897,7 +1085,7 @@ const handleScreenshotChange = (model, type, value) => {
   if (type === 'mention') model.allScreenshot = false
 }
 
-const saveCreateProject = async () => {
+const saveCreateProject = async (runImmediately = false) => {
   createForm.projectName = String(createForm.projectName || '').trim()
   if (!createForm.projectName) {
     ElMessage.warning('请填写项目名称')
@@ -916,10 +1104,20 @@ const saveCreateProject = async () => {
     ElMessage.warning('请至少添加一个问题')
     return
   }
+  if (createForm.monitor.enabled && createForm.monitor.endDateMode === 'date' && !createForm.monitor.endDate) {
+    ElMessage.warning('请选择监控截止日期，或指定为永久')
+    return
+  }
+  if (createForm.monitor.enabled && createForm.monitor.endDateMode === 'date' && isPastDateValue(createForm.monitor.endDate)) {
+    ElMessage.warning('监控截止日期不能早于当天')
+    return
+  }
 
   try {
     await ElMessageBox.confirm(
-      '保存后会立即生效，并立即执行一次问题监控，是否确认保存当前项目配置？',
+      runImmediately
+        ? '保存后会立即生效，并立刻执行一次问题监测，是否确认？'
+        : '保存后会立即生效，但不会立刻执行监测，是否确认？',
       '确认保存',
       {
         confirmButtonText: '确认保存',
@@ -949,12 +1147,15 @@ const saveCreateProject = async () => {
     questionCount: createForm.questions.length,
     models: enabledModels,
     cycle: `${createForm.monitor.period === 'daily' ? '每日' : createForm.monitor.period === 'weekly' ? '每周' : '间隔'}/${createForm.monitor.dailyTimes}次`,
+    monitorEndDate: createForm.monitor.endDateMode === 'permanent' ? '永久' : createForm.monitor.endDate,
+    autoCloseOnExpire: createForm.monitor.endDateMode === 'date',
     status: createForm.monitor.enabled ? '运行中' : '停止',
-    updateTime: '-',
+    updateTime: runImmediately ? formatNow() : '-',
+    lastManualRunAt: runImmediately ? new Date().toISOString() : undefined,
     createTime: new Date().toISOString().slice(0, 10).replaceAll('-', '.')
   })
   createDialogVisible.value = false
-  ElMessage.success('项目创建成功，已开始执行一次问题监控')
+  ElMessage.success(runImmediately ? '项目创建成功，已开始执行一次监测' : '项目创建成功')
 }
 
 </script>
@@ -984,6 +1185,10 @@ const saveCreateProject = async () => {
 .status-text { font-size: 13px; font-weight: 500; }
 .text-success { color: #0f9f59; font-weight: 700; }
 .text-muted { color: #909399; }
+.run-progress-cell { display: flex; flex-direction: column; align-items: stretch; min-width: 150px; }
+.run-model-progress-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+.run-model-progress { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border-radius: 4px; background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; font-size: 11px; font-weight: 700; line-height: 18px; white-space: nowrap; }
+.run-progress-idle { color: #c0c4cc; }
 .table-actions { display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
 .table-actions :deep(.el-button) { margin-left: 0; padding: 0; }
 :global(.billing-confirm-box .el-message-box__btns) { display: flex; align-items: center; gap: 10px; }
@@ -1069,8 +1274,9 @@ const saveCreateProject = async () => {
 .dialog-pagination { display: flex; align-items: center; justify-content: space-between; color: #64748b; font-size: 13px; margin-top: 14px; }
 .monitor-create-section .section-bar { margin-bottom: 12px; }
 .monitor-title-bar { justify-content: flex-start; }
-.section-title-with-switch { display: inline-flex; align-items: center; gap: 12px; }
+.section-title-with-switch { display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .section-title-with-switch .section-title { margin-bottom: 0; }
+.deadline-inline { flex: 0 1 auto; }
 .monitor-desc { padding: 12px 14px; border-radius: 8px; background: #fff7ed; border: 1px solid #fdba74; color: #c2410c; line-height: 20px; margin-bottom: 18px; }
 .monitor-desc strong { margin-right: 8px; color: #9a3412; }
 .monitor-form-row { display: flex; align-items: center; gap: 16px 24px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -1120,6 +1326,11 @@ const saveCreateProject = async () => {
 .billing-cost-rule { margin-right: auto; color: #94a3b8; font-size: 13px; white-space: nowrap; }
 .billing-estimate-tip { display: flex; align-items: center; gap: 8px; color: #64748b; font-size: 13px; white-space: nowrap; }
 .billing-cost-amount { color: #dc2626; font-size: 18px; font-weight: 900; }
+.save-only-btn { border-color: #2563eb; color: #2563eb; background: #fff; font-weight: 700; }
+.save-only-btn:hover,
+.save-only-btn:focus { border-color: #1d4ed8; color: #1d4ed8; background: #eff6ff; }
+.start-project-dialog { display: flex; flex-direction: column; gap: 18px; padding: 4px 0; }
+.start-project-name { color: #111827; font-size: 15px; font-weight: 800; }
 
 
 .project-name-section {

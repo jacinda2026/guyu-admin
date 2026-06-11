@@ -14,18 +14,20 @@
       </div>
       <div class="info-group">
         <div class="info-item" style="display: flex; align-items: center; gap: 8px;">
-          <span>监控平台：</span><strong>5个</strong>
+          <span>监控平台：</span><strong>6个</strong>
           <div class="logo-stack single"><span class="logo-badge logo-doubao" style="width:20px;height:20px;font-size:10px;">豆</span></div>
           <div class="logo-stack single"><span class="logo-badge logo-deepseek" style="width:20px;height:20px;font-size:10px;">D</span></div>
           <div class="logo-stack single"><span class="logo-badge logo-ernie" style="width:20px;height:20px;font-size:10px;">文</span></div>
           <div class="logo-stack single"><span class="logo-badge logo-qwen" style="width:20px;height:20px;font-size:10px;">千</span></div>
+          <div class="logo-stack single"><span class="logo-badge logo-kimi" style="width:20px;height:20px;font-size:10px;">K</span></div>
         </div>
         <div class="info-item"><span>今日任务进度：</span><strong>{{ currentOverview.todayProgress }}</strong></div>
       </div>
       <div class="info-group actions">
-        <el-tag type="warning" effect="dark" size="large" style="border-radius: 4px;">运行中</el-tag>
-        <el-button plain>导出数据</el-button>
-        <el-button plain>立即执行</el-button>
+        <el-tag type="warning" effect="dark" size="large" style="border-radius: 4px;">生成报告</el-tag>
+        <el-button plain :disabled="executionProgress.running" @click="runOverviewNow">
+          {{ executionProgress.running ? '执行中' : '手动执行' }}
+        </el-button>
       </div>
     </div>
 
@@ -237,6 +239,7 @@
 import { ref, reactive, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { List } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
 
 // --- 基础状态预设 ---
@@ -250,7 +253,8 @@ const modelOptions = [
   { code: 'doubao', name: '豆包', mark: '豆', logoClass: 'logo-doubao' },
   { code: 'qwen', name: '通义千问', mark: '千', logoClass: 'logo-qwen' },
   { code: 'yuanbao', name: '腾讯元宝', mark: '元', logoClass: 'logo-yuanbao' },
-  { code: 'ernie', name: '文心一言', mark: '文', logoClass: 'logo-ernie' }
+  { code: 'ernie', name: '文心一言', mark: '文', logoClass: 'logo-ernie' },
+  { code: 'kimi', name: 'Kimi', mark: 'K', logoClass: 'logo-kimi' }
 ]
 const selectableModels = modelOptions.filter(item => item.code !== 'ALL')
 
@@ -261,7 +265,7 @@ const filterState = reactive({
   date: '2026-04-15',
   currentDate: '2026-04-15',
   compareDate: '2026-04-14',
-  selectedModels: ['deepseek-chat', 'doubao', 'qwen', 'yuanbao', 'ernie']
+  selectedModels: ['deepseek-chat', 'doubao', 'qwen', 'yuanbao', 'ernie', 'kimi']
 })
 
 const buildTableRows = (items) => items.slice(0, 10).map((item, index) => ({
@@ -331,6 +335,97 @@ const projectOverviewConfigs = {
 const fallbackOverview = projectOverviewConfigs['proj-shuangyanpi']
 const currentProjectId = computed(() => route.params.id || 'proj-shuangyanpi')
 const currentOverview = computed(() => projectOverviewConfigs[currentProjectId.value] || fallbackOverview)
+
+const executionModels = [
+  { code: 'doubao', name: '豆包' },
+  { code: 'yuanbao', name: '腾讯元宝' },
+  { code: 'deepseek-chat', name: 'DeepSeek' },
+  { code: 'qwen', name: '通义千问' },
+  { code: 'ernie', name: '文心一言' },
+  { code: 'kimi', name: 'Kimi' }
+]
+
+const executionProgress = reactive({
+  running: false,
+  models: [],
+  timerId: null,
+  startedAt: null,
+  finishedAt: null
+})
+
+const clearExecutionTimer = () => {
+  if (executionProgress.timerId) {
+    window.clearInterval(executionProgress.timerId)
+    executionProgress.timerId = null
+  }
+}
+
+const emitExecutionProgress = () => {
+  window.dispatchEvent(new CustomEvent('guyu-monitor-execution-progress', {
+    detail: {
+      running: executionProgress.running,
+      projectId: currentProjectId.value,
+      models: executionProgress.models.map(model => ({
+        code: model.code,
+        name: model.name,
+        completedQuestions: model.completedQuestions,
+        totalQuestions: model.totalQuestions
+      }))
+    }
+  }))
+}
+
+const startExecutionProgress = () => {
+  const totalQuestions = Math.max(1, Number(currentOverview.value.questionCount) || 1)
+  clearExecutionTimer()
+  executionProgress.running = true
+  executionProgress.startedAt = new Date().toISOString()
+  executionProgress.finishedAt = null
+  executionProgress.models = executionModels.map(model => ({
+    ...model,
+    completedQuestions: 0,
+    totalQuestions
+  }))
+  emitExecutionProgress()
+
+  const step = Math.max(1, Math.ceil(totalQuestions / 12))
+  executionProgress.timerId = window.setInterval(() => {
+    executionProgress.models.forEach((model, index) => {
+      const modelStep = Math.max(1, step - (index % 2))
+      model.completedQuestions = Math.min(totalQuestions, model.completedQuestions + modelStep)
+    })
+    emitExecutionProgress()
+
+    const finished = executionProgress.models.every(model => model.completedQuestions >= model.totalQuestions)
+    if (finished) {
+      clearExecutionTimer()
+      executionProgress.running = false
+      executionProgress.finishedAt = new Date().toISOString()
+      emitExecutionProgress()
+      ElMessage.success('手动执行完成')
+    }
+  }, 800)
+}
+
+const runOverviewNow = async () => {
+  if (executionProgress.running) {
+    ElMessage.warning('当前项目正在执行中')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm('确认立即手动执行当前项目？', '手动执行确认', {
+      confirmButtonText: '确认执行',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+  } catch (error) {
+    return
+  }
+
+  startExecutionProgress()
+  ElMessage.success('已开始手动执行')
+}
 
 const modelMenuOpen = ref(false)
 const pendingModels = ref(null)
@@ -480,14 +575,16 @@ const modelMentionRateSeries = {
   doubao: { name: '豆包', color: '#245bff', data: [73.3, 61.7, 66.7, 55, 78.3, 70, 86.7] },
   qwen: { name: '通义千问', color: '#f59e0b', data: [46.7, 55, 48.3, 60, 51.7, 63.3, 58.3] },
   yuanbao: { name: '腾讯元宝', color: '#8b5cf6', data: [63.3, 58.3, 73.3, 66.7, 80, 71.7, 76.7] },
-  ernie: { name: '文心一言', color: '#ef4444', data: [38.3, 46.7, 41.7, 56.7, 48.3, 60, 53.3] }
+  ernie: { name: '文心一言', color: '#ef4444', data: [38.3, 46.7, 41.7, 56.7, 48.3, 60, 53.3] },
+  kimi: { name: 'Kimi', color: '#06b6d4', data: [51.7, 58.3, 55, 61.7, 64.3, 67, 70.3] }
 }
 const modelAvgRankSeries = {
   'deepseek-chat': { name: 'DeepSeek', color: '#10b981', data: [3.8, 2.9, 4.1, 2.6, 3.3, 2.4, 3.0] },
   doubao: { name: '豆包', color: '#245bff', data: [2.7, 3.4, 2.2, 4.0, 2.1, 2.8, 1.9] },
   qwen: { name: '通义千问', color: '#f59e0b', data: [4.8, 4.1, 5.2, 3.7, 4.5, 3.2, 4.0] },
   yuanbao: { name: '腾讯元宝', color: '#8b5cf6', data: [3.1, 4.0, 2.8, 3.5, 2.4, 3.1, 2.6] },
-  ernie: { name: '文心一言', color: '#ef4444', data: [5.5, 4.7, 5.9, 4.2, 5.0, 3.8, 4.6] }
+  ernie: { name: '文心一言', color: '#ef4444', data: [5.5, 4.7, 5.9, 4.2, 5.0, 3.8, 4.6] },
+  kimi: { name: 'Kimi', color: '#06b6d4', data: [4.2, 3.7, 4.5, 3.3, 3.9, 3.1, 3.5] }
 }
 const mentionChangeData = [
   { brand: '初敏', value: 80 },
@@ -1164,6 +1261,12 @@ onMounted(() => {
 })
 
 watch(currentProjectId, async () => {
+  clearExecutionTimer()
+  executionProgress.running = false
+  executionProgress.models = []
+  executionProgress.startedAt = null
+  executionProgress.finishedAt = null
+  emitExecutionProgress()
   tableRankData.value = currentOverview.value.tableRows
   closeMentionRateDetail()
   closeAvgRankDetail()
@@ -1174,6 +1277,10 @@ watch(currentProjectId, async () => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  clearExecutionTimer()
+  executionProgress.running = false
+  executionProgress.models = []
+  emitExecutionProgress()
   chartInsts.forEach(c => c.dispose())
   if (mentionRateDetailChart) mentionRateDetailChart.dispose()
   if (avgRankDetailChart) avgRankDetailChart.dispose()
@@ -1190,7 +1297,6 @@ onUnmounted(() => {
 .info-item { font-size: 13px; color: #4b5563; }
 .info-item strong { color: #111827; margin-left: 4px; }
 .actions { flex-direction: row; align-items: center; margin-left: auto; gap: 12px; }
-
 /* 2. 原生 HTML CSS 复刻 (局部限定避免污染) */
 .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.03); }
 .filter-card { padding: 16px; margin-bottom: 20px; }
@@ -1233,6 +1339,7 @@ onUnmounted(() => {
 .logo-qwen { background: linear-gradient(135deg,#8b5cf6,#6366f1); }
 .logo-yuanbao { background: linear-gradient(135deg,#38bdf8,#2563eb); }
 .logo-ernie { background: linear-gradient(135deg,#0ea5e9,#2563eb); }
+.logo-kimi { background: linear-gradient(135deg,#06b6d4,#0891b2); }
 
 .selected-info { margin-left: auto; color: #245bff; background: #f0f5ff; border: 1px solid #dbeafe; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: bold; }
 

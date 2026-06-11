@@ -82,6 +82,18 @@
             <el-breadcrumb-item v-if="currentDetailTitle">{{ currentDetailTitle }}</el-breadcrumb-item>
           </el-breadcrumb>
         </div>
+        <div v-if="showMonitorProgressTag" class="header-progress-tag">
+          <span class="header-progress-label">执行中：</span>
+          <span class="header-progress-items">
+            <span
+              v-for="model in monitorExecutionProgress.models"
+              :key="model.code || model.name"
+              class="header-progress-item"
+            >
+              {{ model.name }} {{ model.completedQuestions }}/{{ model.totalQuestions }}
+            </span>
+          </span>
+        </div>
         <div class="header-right">
           <el-button
             class="analysis-entry"
@@ -176,7 +188,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CaretBottom, ChatDotRound, Close, Cpu, CreditCard, DataBoard, Expand, Fold, House, Promotion, Setting } from '@element-plus/icons-vue'
 
@@ -187,6 +199,11 @@ const analysisPanelVisible = ref(false)
 const analysisInput = ref('')
 const asideWidth = computed(() => (isMenuCollapsed.value ? '64px' : '200px'))
 const analysisMessages = ref([])
+const monitorExecutionProgress = ref({
+  running: false,
+  projectId: '',
+  models: []
+})
 
 const analysisGuides = {
   dashboard: {
@@ -344,6 +361,23 @@ const toggleMenu = () => {
   isMenuCollapsed.value = !isMenuCollapsed.value
 }
 
+const handleMonitorExecutionProgress = (event) => {
+  const detail = event.detail || {}
+  monitorExecutionProgress.value = {
+    running: Boolean(detail.running),
+    projectId: detail.projectId || '',
+    models: Array.isArray(detail.models) ? detail.models : []
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('guyu-monitor-execution-progress', handleMonitorExecutionProgress)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('guyu-monitor-execution-progress', handleMonitorExecutionProgress)
+})
+
 const toggleAnalysisPanel = () => {
   analysisPanelVisible.value = !analysisPanelVisible.value
 }
@@ -423,6 +457,12 @@ const monitorQuestionTitles = {
 
 const projectId = computed(() => route.params.id || 'demo-project')
 const currentProjectName = computed(() => projectOptions.find(project => project.id === projectId.value)?.name || '未知项目')
+const showMonitorProgressTag = computed(() =>
+  route.path.includes('/dashboard') &&
+  monitorExecutionProgress.value.running &&
+  monitorExecutionProgress.value.projectId === projectId.value &&
+  monitorExecutionProgress.value.models.length > 0
+)
 
 const currentPrimaryMenu = computed(() => {
   const path = route.path
@@ -587,14 +627,18 @@ const goCurrentPage = () => {
   display: none;
 }
 .project-main-container { display: flex; flex-direction: column; min-width: 0; }
-.project-header { height: 50px; background: #fff; display: flex; justify-content: space-between; align-items: center; padding: 0 24px; border-bottom: 1px solid #e4e7ed; }
-.header-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.project-header { height: 50px; background: #fff; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 0 24px; border-bottom: 1px solid #e4e7ed; }
+.header-left { display: flex; align-items: center; gap: 16px; min-width: 0; flex: 1 1 0; }
 .collapse-toggle { color: #606266; font-size: 18px; }
 .collapse-toggle:hover { color: #2b65f0; background: #eef4ff; }
 :deep(.el-breadcrumb__inner) { font-size: 13px; color: #606266; }
 .breadcrumb-link { padding: 0; border: 0; background: transparent; color: #475569; font: inherit; cursor: pointer; }
 .breadcrumb-link:hover { color: #2563eb; text-decoration: underline; }
-.header-right { display: flex; align-items: center; gap: 24px; }
+.header-progress-tag { flex: 0 1 auto; max-width: min(720px, 48vw); min-width: 0; display: inline-flex; align-items: center; gap: 10px; height: 30px; padding: 0 12px; border-radius: 6px; background: #fff7ed; border: 1px solid #fdba74; color: #c2410c; box-shadow: 0 3px 10px rgba(234, 88, 12, 0.10); overflow: hidden; }
+.header-progress-label { flex: 0 0 auto; font-size: 12px; font-weight: 900; line-height: 1; }
+.header-progress-items { min-width: 0; display: inline-flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; }
+.header-progress-item { flex: 0 0 auto; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.header-right { display: flex; align-items: center; gap: 24px; flex: 1 1 0; justify-content: flex-end; min-width: 0; }
 .analysis-entry {
   height: 32px;
   padding: 0 12px;

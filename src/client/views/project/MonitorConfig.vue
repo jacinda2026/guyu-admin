@@ -19,6 +19,29 @@
               <div class="section-title tooltip-title">监控配置</div>
             </el-tooltip>
             <el-switch v-model="enabled" :disabled="!editing" active-text="开" inactive-text="关" inline-prompt />
+            <div class="inline-form-item deadline-inline">
+              <el-tooltip content="到期后自动关闭监控" placement="top">
+                <span class="inline-label tooltip-title">监控截止日期</span>
+              </el-tooltip>
+            <el-segmented
+              v-model="basic.endDateMode"
+              :disabled="!editing"
+              :options="deadlineModeOptions"
+            />
+            <el-date-picker
+              v-if="basic.endDateMode === 'date'"
+              v-model="basic.endDate"
+              :disabled="!editing"
+              type="date"
+              format="YYYY/MM/DD"
+              value-format="YYYY/MM/DD"
+              placeholder="选择日期"
+              :disabled-date="disablePastDate"
+              :editable="false"
+              @change="normalizeBasicEndDate"
+              class="date-picker compact-date-picker"
+            />
+            </div>
           </div>
         </div>
 
@@ -270,6 +293,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const MONITOR_METRIC_CONFIG_KEY = 'guyu-monitor-metric-config'
+const MONITOR_BASIC_CONFIG_KEY = 'guyu-monitor-basic-config'
 const editing = ref(false)
 const MODEL_UNIT_PRICE = 0.1
 const PROJECT_QUESTION_COUNT = 40
@@ -282,6 +306,14 @@ const handleEditSave = async () => {
 
   if (metrics.monthlyDays && basic.period !== 'daily') {
     ElMessage.warning('每月达标天数需要监控周期选择每日，否则无法统计该指标')
+    return
+  }
+  if (enabled.value && basic.endDateMode === 'date' && !basic.endDate) {
+    ElMessage.warning('请选择监控截止日期，或指定为永久')
+    return
+  }
+  if (enabled.value && basic.endDateMode === 'date' && isPastDateValue(basic.endDate)) {
+    ElMessage.warning('监控截止日期不能早于当天')
     return
   }
 
@@ -299,6 +331,7 @@ const handleEditSave = async () => {
         closeOnPressEscape: false
       }
     )
+    saveMonitorBasicConfig()
     saveMonitorMetricConfig()
     editing.value = false
     ElMessage.success('保存成功，配置已立即生效')
@@ -317,6 +350,8 @@ const basic = reactive({
   executionTime: '02:00',
   weekdays: ['mon'],
   startDate: '2026/05/12',
+  endDateMode: 'permanent',
+  endDate: '2026/07/11',
   intervalDays: 2,
   splitTimes: ['02:00']
 })
@@ -327,6 +362,35 @@ const executeModeOptions = [
   { label: '连续完成', value: 'continuous' },
   { label: '分时执行', value: 'split' }
 ]
+
+const deadlineModeOptions = [
+  { label: '日期', value: 'date' },
+  { label: '永久', value: 'permanent' }
+]
+
+const getStartOfDayTime = (value) => {
+  const date = value instanceof Date ? value : new Date(typeof value?.valueOf === 'function' ? value.valueOf() : value)
+  date.setHours(0, 0, 0, 0)
+  return date.getTime()
+}
+
+const disablePastDate = (date) => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return getStartOfDayTime(date) < today.getTime()
+}
+
+const isPastDateValue = (value) => {
+  if (!value) return false
+  return disablePastDate(String(value).replaceAll('/', '-'))
+}
+
+const normalizeBasicEndDate = () => {
+  if (basic.endDateMode === 'date' && isPastDateValue(basic.endDate)) {
+    basic.endDate = ''
+    ElMessage.warning('监控截止日期不能早于当天')
+  }
+}
 
 const weekdayOptions = [
   { label: '周一', value: 'mon' },
@@ -356,7 +420,10 @@ basic.splitTimes = generateEvenTimes(basic.askTimes)
 watch(
   () => basic.askTimes,
   value => {
-    basic.splitTimes = generateEvenTimes(value)
+    const safeCount = Math.max(1, Number(value) || 1)
+    if (basic.splitTimes.length !== safeCount) {
+      basic.splitTimes = generateEvenTimes(value)
+    }
   }
 )
 const collectChannel = ref('standard')
@@ -432,6 +499,38 @@ const saveMonitorMetricConfig = () => {
     monthlyDays: { enabled: metrics.monthlyDays, target: metrics.monthlyDaysTarget }
   }))
 }
+const loadMonitorBasicConfig = () => {
+  try {
+    const raw = localStorage.getItem(MONITOR_BASIC_CONFIG_KEY)
+    if (!raw) return
+    const saved = JSON.parse(raw)
+    enabled.value = saved.enabled ?? enabled.value
+    Object.assign(basic, {
+      period: saved.period || basic.period,
+      askTimes: saved.askTimes ?? basic.askTimes,
+      executionMode: saved.executionMode || basic.executionMode,
+      executionTime: saved.executionTime || basic.executionTime,
+      weekdays: Array.isArray(saved.weekdays) ? saved.weekdays : basic.weekdays,
+      startDate: saved.startDate || basic.startDate,
+      endDateMode: saved.endDateMode || basic.endDateMode,
+      endDate: saved.endDate || basic.endDate,
+      intervalDays: saved.intervalDays ?? basic.intervalDays,
+      splitTimes: Array.isArray(saved.splitTimes) ? saved.splitTimes : basic.splitTimes
+    })
+  } catch (error) {
+    localStorage.removeItem(MONITOR_BASIC_CONFIG_KEY)
+  }
+}
+const saveMonitorBasicConfig = () => {
+  localStorage.setItem(MONITOR_BASIC_CONFIG_KEY, JSON.stringify({
+    enabled: enabled.value,
+    autoCloseOnExpire: basic.endDateMode === 'date',
+    ...basic,
+    weekdays: [...basic.weekdays],
+    splitTimes: [...basic.splitTimes]
+  }))
+}
+loadMonitorBasicConfig()
 loadMonitorMetricConfig()
 const handleMonthlyDaysChange = (value) => {
   if (!value || basic.period === 'daily') return
@@ -1163,9 +1262,13 @@ watch(
   display: inline-flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 .section-title-with-switch .section-title {
   margin-bottom: 0;
+}
+.deadline-inline {
+  flex: 0 1 auto;
 }
 .tooltip-title {
   cursor: help;
